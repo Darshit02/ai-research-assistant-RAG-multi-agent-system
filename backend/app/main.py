@@ -1,15 +1,19 @@
 from fastapi import Depends, FastAPI 
 from app.database.db import engine
 from app.database.models.model import Base, User
-from app.api import auth ,document_routes
+from app.api import auth ,document_api
 from app.core.dependencies import get_current_user
 
 
 app = FastAPI(title="Research Assistant")
 Base.metadata.create_all(bind=engine)
+
+if Base.metadata.create_all(bind=engine) :
+    print("table created successfully")
+
 app.include_router(auth.router)
 app.include_router(
-    document_routes.router,
+    document_api.router,
     prefix="/documents",
     tags=["Documents"]
 )
