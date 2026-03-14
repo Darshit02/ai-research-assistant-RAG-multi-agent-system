@@ -7,8 +7,6 @@ from app.database.db import get_db
 from app.database.models.model import User
 from app.core.security import SECRET_KEY
 
-
-
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
 

@@ -1,14 +1,19 @@
-from fastapi import Depends, FastAPI 
+from fastapi import Depends, FastAPI
 from app.database.db import engine
 from app.database.models.model import Base, User
-from app.api import auth ,document_api
+from app.database.models.chat_session import ChatSession
+from app.database.models.chat_messages import ChatMessage
+from app.api import auth, document_api
 from app.core.dependencies import get_current_user
+from fastapi.staticfiles import StaticFiles
 
 
 app = FastAPI(title="Research Assistant")
+
+app.mount("/pdf", StaticFiles(directory="uploads"), name="pdf")
 Base.metadata.create_all(bind=engine)
 
-if Base.metadata.create_all(bind=engine) :
+if Base.metadata.create_all(bind=engine):
     print("table created successfully")
 
 app.include_router(auth.router)
@@ -18,11 +23,13 @@ app.include_router(
     tags=["Documents"]
 )
 
+
 @app.get("/")
 def root_route():
     return {
-        "message" : "Hello world"
+        "message": "Hello world"
     }
+
 
 @app.get("/user/me")
 def get_profile(current_user: User = Depends(get_current_user)):
