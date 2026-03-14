@@ -1,14 +1,20 @@
 from fastapi import Depends, FastAPI
-from app.database.db import engine
-from app.database.models.model import Base, User
-from app.database.models.chat_session import ChatSession
-from app.database.models.chat_messages import ChatMessage
+from fastapi.staticfiles import StaticFiles
+from slowapi.middleware import SlowAPIMiddleware
+
 from app.api import auth, document_api
 from app.core.dependencies import get_current_user
-from fastapi.staticfiles import StaticFiles
+
+from app.database.db import engine
+from app.database.models.chat_messages import ChatMessage
+from app.database.models.chat_session import ChatSession
+from app.database.models.model import Base, User
+from app.core.limiter import limiter
 
 
 app = FastAPI(title="Research Assistant")
+app.state.limiter = limiter
+app.add_middleware(SlowAPIMiddleware)
 
 app.mount("/pdf", StaticFiles(directory="uploads"), name="pdf")
 Base.metadata.create_all(bind=engine)

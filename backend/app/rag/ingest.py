@@ -2,6 +2,8 @@ from app.services.pdf_loader import extract_text_from_pdf, extract_text_with_pag
 from app.services.text_splitter import split_pages, split_text
 from app.services.embedding_service import create_embeddings
 from app.vector.vector_store import store_embeddings
+from app.database.models import document
+from app.database import db
 
 def ingest_document(file_path: str, document_id: int):
     pages = extract_text_with_pages(file_path)
@@ -10,6 +12,8 @@ def ingest_document(file_path: str, document_id: int):
     embeddings = create_embeddings(texts)
     filename = file_path.split("/")[-1]
     store_embeddings(chunks, embeddings, document_id, filename)
+    document.status = "ready"
+    db.commit()
     print(f"Document {document_id} processed with {len(chunks)} chunks.")
     return {
         "chunks": len(chunks),

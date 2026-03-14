@@ -47,3 +47,14 @@ def search_similar_chunks(query_embedding, document_ids, n_results=5):
         })
 
     return chunks
+
+def delete_document_embeddings(document_id: int):
+
+    ids = collection.get(
+        where={"document_id": document_id}
+    )["ids"]
+
+    if ids:
+        collection.delete(ids=ids)
+
+    print(f"Deleted embeddings for document {document_id}")

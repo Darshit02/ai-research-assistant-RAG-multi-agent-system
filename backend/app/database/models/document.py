@@ -8,5 +8,6 @@ class Document(Base):
     filename = Column(String , nullable=False)
     filepath  = Column(String , nullable=False)
     user_id = Column(Integer , ForeignKey("users.id"))
+    status = Column(String, default="processing")
     uploaded_id = Column(DateTime,default=datetime.utcnow)
     expires_at = Column(DateTime)

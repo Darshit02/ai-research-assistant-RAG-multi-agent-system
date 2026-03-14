@@ -1,6 +1,9 @@
+import json
 from app.services.embedding_service import create_embeddings
 from app.vector.vector_store import search_similar_chunks
 from app.services.hybrid_search import keyword_search
+from app.services.similarity import cosine_similarity
+from app.database.models.chat import ChatHistory
 
 
 def retrieve_context(question: str, document_ids):
@@ -18,3 +21,23 @@ def retrieve_context(question: str, document_ids):
             results.append(c)
 
     return results[:5]
+
+def find_cached_answer(question_embedding, user_id, db):
+
+    history = db.query(ChatHistory).filter(
+        ChatHistory.user_id == user_id
+    ).all()
+
+    for record in history:
+
+        old_embedding = json.loads(record.embedding)
+
+        similarity = cosine_similarity(
+            question_embedding,
+            old_embedding
+        )
+
+        if similarity > 0.9:
+            return record.answer
+
+    return None
