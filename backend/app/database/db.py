@@ -2,6 +2,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker , declarative_base
 import os
 from dotenv import load_dotenv
+from sqlalchemy import text
 
 load_dotenv()
 
@@ -22,3 +23,18 @@ def get_db():
         yield db
     finally :
         db.close()
+
+
+def ensure_user_columns():
+    """Add missing columns to users table if they were added to the model later."""
+    with engine.connect() as conn:
+        for column_sql in [
+            "ALTER TABLE users ADD COLUMN preferred_model VARCHAR DEFAULT 'gemini-2.5-flash'",
+            "ALTER TABLE users ADD COLUMN api_key VARCHAR",
+        ]:
+            try:
+                conn.execute(text(column_sql))
+                conn.commit()
+            except Exception:
+                conn.rollback()
+                pass
