@@ -2,7 +2,8 @@ import json
 import os
 
 import google.generativeai as genai
-
+from collections import defaultdict
+from app.services.query_planner import plan_queries
 from app.database.models.chat import ChatHistory
 from app.database.models.chat_messages import ChatMessage
 from app.database.models.document import Document
@@ -10,8 +11,10 @@ from app.database.models.model import User
 from app.rag.retrieval import retrieve_context
 from app.services.embedding_service import create_embeddings
 from app.services.similarity import cosine_similarity
+from app.services.retrieval_memory import get_cached_chunks, store_retrieval_memory
 
 DEFAULT_MODEL = "models/gemini-2.5-flash"
+
 
 def _get_model(db, user_id: int):
     """Configure genai and return a GenerativeModel for the given user (API key + preferred model)."""
@@ -30,14 +33,11 @@ def generate_answer(question: str, user_id: int, session_id: int, db):
     ).all()
 
     for record in history_cache:
-
         old_embedding = json.loads(record.embedding)
-
         similarity = cosine_similarity(
             question_embedding,
             old_embedding
         )
-
         if similarity > 0.90:
             print("Returning cached answer")
 
@@ -59,34 +59,94 @@ def generate_answer(question: str, user_id: int, session_id: int, db):
 
     document_ids = [doc.id for doc in docs]
 
-    context_chunks = retrieve_context(question, document_ids)
-
-    context = "\n\n".join(
-        f"{c['text']} [Page {c['page']}]" for c in context_chunks
+    model = _get_model(db, user_id)
+    cached_chunks = get_cached_chunks(
+        session_id,
+        question_embedding,
+        db
     )
 
-    citations = [
-        {"document_id": c["document_id"], "page": c["page"]}
-        for c in context_chunks
-    ]
-    prompt = f"""
+    if cached_chunks:
+        context_chunks = cached_chunks
+    else:
+        sub_questions = plan_queries(question, model)
+
+        all_chunks = []
+
+        for q in sub_questions:
+            chunks = retrieve_context(q, document_ids)
+            all_chunks.extend(chunks)
+        seen = set()
+        context_chunks = []
+
+        for c in all_chunks:
+            key = (c["text"], c["page"], c["document_id"])
+            if key not in seen:
+                seen.add(key)
+                context_chunks.append(c)
+        store_retrieval_memory(
+            session_id,
+            question_embedding,
+            context_chunks,
+            db
+        )
+    grouped_chunks = defaultdict(list)
+    for chunk in context_chunks:
+        grouped_chunks[chunk["document_id"]].append(chunk)
+    document_analyses = []
+    for doc_id, chunks in grouped_chunks.items():
+        doc_context = "\n\n".join(
+            f"{c['text']} [Page {c['page']}]"
+            for c in chunks
+        )
+        doc_prompt = f"""
+You are analyzing a research document.
+
+Document Context:
+{doc_context}
+
+Question:
+{question}
+
+Explain how this document answers the question.
+"""
+
+        doc_response = model.generate_content(doc_prompt)
+        summary = doc_response.candidates[0].content.parts[0].text
+        document_analyses.append(summary)
+    combined_analysis = "\n\n".join(document_analyses)
+
+    final_prompt = f"""
 You are an AI research assistant.
 
 Conversation history:
 {history}
 
-Context from documents:
-{context}
+Multiple documents were analyzed.
+
+Document analyses:
+{combined_analysis}
 
 User question:
 {question}
 
-Answer clearly.
+Provide a final comprehensive answer.
+If documents differ, compare them.
 """
-    model = _get_model(db, user_id)
-    response = model.generate_content(prompt)
+
+    response = model.generate_content(final_prompt)
 
     answer = response.candidates[0].content.parts[0].text
+    top_evidence = context_chunks[:3]
+
+    citations = [
+        {
+            "document_id": c["document_id"],
+            "page": c["page"],
+            "text": c["text"]
+        }
+        for c in top_evidence
+    ]
 
     db.add(
         ChatMessage(
@@ -103,7 +163,6 @@ Answer clearly.
             content=answer
         )
     )
-
     cache = ChatHistory(
         user_id=user_id,
         question=question,

@@ -251,3 +251,24 @@ def update_settings(
     db.commit()
 
     return {"message": "Settings updated"}
+
+@router.get("/highlight")
+def highlight_text(
+    document_id: int,
+    page: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+
+    document = db.query(Document).filter(
+        Document.id == document_id,
+        Document.user_id == current_user.id
+    ).first()
+
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    return {
+        "file_url": f"/pdf/{document.filename}",
+        "page": page
+    }
