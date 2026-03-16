@@ -24,90 +24,55 @@ router = APIRouter()
 UPLOAD_DIR = "uploads"
 
 
-@router.post("/upload")
-def upload_pdf(
-    background_tasks: BackgroundTasks,
-    file: UploadFile = File(...),
+# List User Documents
+@router.get("/")
+def document_stats(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user)
 ):
 
-    file_path = os.path.join(UPLOAD_DIR, file.filename)
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+    docs = db.query(Document).filter(
+        Document.user_id == current_user.id
+    ).all()
 
-    expires_at = datetime.utcnow() + timedelta(days=7)
-    document = Document(
-        filename=file.filename,
-        filepath=file_path,
-        user_id=current_user.id,
-        expires_at=expires_at
-    )
+    return [
+        {
+            "id": d.id,
+            "filename": d.filename,
+            "document_id": "",
+            "status": d.status,
+            "uploaded_at": d.uploaded_at
+        }
+        for d in docs
+    ]
 
-    db.add(document)
-    db.commit()
-    db.refresh(document)
+# Document Details
 
-    # Run ingestion in background
-    background_tasks.add_task(
-        ingest_document,
-        file_path,
-        document.id
-    )
+
+@router.get("/{document_id}")
+def get_document(
+    document_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+
+    document = db.query(Document).filter(
+        Document.id == document_id,
+        Document.user_id == current_user.id
+    ).first()
+
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
 
     return {
-        "message": "PDF uploaded successfully. Processing started.",
-        "filename": file.filename,
-        "expires_at": expires_at
+        "id": document.id,
+        "filename": document.filename,
+        "filepath": document.filepath,
+        "status": document.status,
+        "uploaded_at": document.uploaded_at
     }
 
-
-@router.post("/ask")
-@limiter.limit("10/minute")
-def ask_question(
-    request: Request,
-    question: str,
-    session_id: int,document_ids: list[int],
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-
-    result = generate_answer(
-        question,
-        current_user.id,
-        session_id,
-        document_ids,
-        db,
-    )
-
-    return result
-
-
-@router.post("/chat/start")
-def start_chat(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-
-    session = ChatSession(user_id=current_user.id)
-
-    db.add(session)
-    db.commit()
-    db.refresh(session)
-
-    return {"session_id": session.id}
-
-
-@router.post("/ask-stream")
-def ask_stream(
-    question: str,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-
-    generator = stream_answer(question, current_user.id, db)
-
-    return StreamingResponse(generator, media_type="text/plain")
+# delete document
 
 
 @router.delete("/{document_id}")
@@ -132,7 +97,167 @@ def delete_document(
 
     return {"message": "Document deleted successfully"}
 
+# document upload
 
+
+@router.post("/upload")
+def upload_pdf(
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+
+    file_path = os.path.join(UPLOAD_DIR, file.filename)
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+
+    expires_at = datetime.utcnow() + timedelta(days=7)
+    document = Document(
+        filename=file.filename,
+        filepath=file_path,
+        user_id=current_user.id,
+        expires_at=expires_at
+    )
+
+    db.add(document)
+    db.commit()
+    db.refresh(document)
+    background_tasks.add_task(
+        ingest_document,
+        file_path,
+        document.id
+    )
+
+    return {
+        "message": "PDF uploaded successfully. Processing started.",
+        "filename": file.filename,
+        "expires_at": expires_at
+    }
+
+
+@router.post("/ask")
+@limiter.limit("10/minute")
+def ask_question(
+    request: Request,
+    question: str,
+    session_id: int, document_ids: list[int],
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+
+    result = generate_answer(
+        question,
+        current_user.id,
+        session_id,
+        document_ids,
+        db,
+    )
+
+    return result
+
+# chat new session
+
+
+@router.post("/sessions")
+def create_session(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+
+    session = ChatSession(
+        user_id=current_user.id
+    )
+
+    db.add(session)
+    db.commit()
+    db.refresh(session)
+
+    return {
+        "session_id": session.id
+    }
+
+# all chats or sessions
+
+
+@router.get("/get-all-sessions")
+def chat_stats(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+
+    sessions = db.query(ChatSession).filter(
+        ChatSession.user_id == current_user.id
+    ).all()
+
+    return [
+        {
+            "session_id": s.id,
+            "created_at": s.created_at
+        }
+        for s in sessions
+    ]
+
+#  chat message history
+
+
+@router.get("/messages/{session_id}")
+def get_messages(
+    session_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+
+    messages = db.query(ChatMessage).filter(
+        ChatMessage.session_id == session_id
+    ).all()
+
+    return [
+        {
+            "role": m.role,
+            "content": m.content,
+            "created_at": m.created_at
+        }
+        for m in messages
+    ]
+
+# session delete / delete chat history
+
+
+@router.delete("/sessions/{session_id}")
+def delete_session(
+    session_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+
+    session = db.query(ChatSession).filter(
+        ChatSession.id == session_id,
+        ChatSession.user_id == current_user.id
+    ).first()
+
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    db.delete(session)
+    db.commit()
+
+    return {"message": "Session deleted"}
+
+
+@router.post("/ask-stream")
+def ask_stream(
+    question: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+
+    generator = stream_answer(question, current_user.id, db)
+
+    return StreamingResponse(generator, media_type="text/plain")
+
+
+# Document Search
 @router.get("/search")
 def search_documents(
     query: str,
@@ -202,47 +327,6 @@ def dashboard_analytics(
         "chat_sessions": total_chats,
         "messages": total_messages
     }
-
-
-@router.get("/chats")
-def chat_stats(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-
-    sessions = db.query(ChatSession).filter(
-        ChatSession.user_id == current_user.id
-    ).all()
-
-    return [
-        {
-            "session_id": s.id,
-            "created_at": s.created_at
-        }
-        for s in sessions
-    ]
-
-
-@router.get("/documents")
-def document_stats(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-
-    docs = db.query(Document).filter(
-        Document.user_id == current_user.id
-    ).all()
-
-    return [
-        {
-            "id": d.id,
-            "filename": d.filename,
-            "document_id": "" ,
-            "status": d.status,
-            "uploaded_at": d.uploaded_at
-        }
-        for d in docs
-    ]
 
 
 @router.put("/settings")
