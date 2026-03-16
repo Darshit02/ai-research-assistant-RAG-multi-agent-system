@@ -5,7 +5,7 @@ from slowapi.middleware import SlowAPIMiddleware
 from app.api import auth, document_api
 from app.core.dependencies import get_current_user
 
-from app.database.db import engine, ensure_user_columns
+from app.database.db import engine, ensure_user_columns, ensure_document_columns
 from app.database.models.chat_messages import ChatMessage
 from app.database.models.chat_session import ChatSession
 from app.database.models.model import Base, User
@@ -19,7 +19,7 @@ app.add_middleware(SlowAPIMiddleware)
 app.mount("/pdf", StaticFiles(directory="uploads"), name="pdf")
 Base.metadata.create_all(bind=engine)
 ensure_user_columns()
-
+ensure_document_columns()
 app.include_router(auth.router)
 app.include_router(
     document_api.router,

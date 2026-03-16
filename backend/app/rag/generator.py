@@ -12,6 +12,7 @@ from app.rag.retrieval import retrieve_context
 from app.services.embedding_service import create_embeddings
 from app.services.similarity import cosine_similarity
 from app.services.retrieval_memory import get_cached_chunks, store_retrieval_memory
+from app.services.response_parser import parse_structured_answer
 
 DEFAULT_MODEL = "models/gemini-2.5-flash"
 
@@ -26,7 +27,7 @@ def _get_model(db, user_id: int):
     return genai.GenerativeModel(user.preferred_model or DEFAULT_MODEL)
 
 
-def generate_answer(question: str, user_id: int, session_id: int, db):
+def generate_answer(question: str, user_id: int, session_id: int, db ,document_ids: list[int],):
     question_embedding = create_embeddings([question])[0]
     history_cache = db.query(ChatHistory).filter(
         ChatHistory.user_id == user_id
@@ -57,7 +58,22 @@ def generate_answer(question: str, user_id: int, session_id: int, db):
         Document.user_id == user_id
     ).all()
 
-    document_ids = [doc.id for doc in docs]
+    if not docs:
+        return {
+            "summary": "",
+            "key_findings": "",
+            "evidence": "",
+            "comparison": "",
+            "conclusion": "",
+            "citations": [],
+            "message": (
+                "I could not find any uploaded documents for your account, "
+                "so I wasn't able to answer this question. "
+                "Please upload one or more PDFs and try again."
+            ),
+        }
+
+    
 
     model = _get_model(db, user_id)
     cached_chunks = get_cached_chunks(
@@ -76,6 +92,22 @@ def generate_answer(question: str, user_id: int, session_id: int, db):
         for q in sub_questions:
             chunks = retrieve_context(q, document_ids)
             all_chunks.extend(chunks)
+
+        if not all_chunks:
+            return {
+                "summary": "",
+                "key_findings": "",
+                "evidence": "",
+                "comparison": "",
+                "conclusion": "",
+                "citations": [],
+                "message": (
+                    "I could not find any relevant content in your documents "
+                    "to answer this question. "
+                    "Try rephrasing your question or uploading more detailed documents."
+                ),
+            }
+
         seen = set()
         context_chunks = []
 
@@ -130,13 +162,29 @@ Document analyses:
 User question:
 {question}
 
-Provide a final comprehensive answer.
-If documents differ, compare them.
+Return the response in the following structured format:
+
+Summary:
+<short overview>
+
+Key Findings:
+- finding 1
+- finding 2
+
+Evidence:
+- important supporting facts from documents
+
+Comparison:
+<compare documents if relevant>
+
+Conclusion:
+<final insight>
 """
 
     response = model.generate_content(final_prompt)
 
     answer = response.candidates[0].content.parts[0].text
+    structured = parse_structured_answer(answer)
     top_evidence = context_chunks[:3]
 
     citations = [
@@ -175,7 +223,11 @@ If documents differ, compare them.
     db.commit()
 
     return {
-        "answer": answer,
+        "summary": structured["summary"].strip(),
+        "key_findings": structured["key_findings"].strip(),
+        "evidence": structured["evidence"].strip(),
+        "comparison": structured["comparison"].strip(),
+        "conclusion": structured["conclusion"].strip(),
         "citations": citations
     }
 

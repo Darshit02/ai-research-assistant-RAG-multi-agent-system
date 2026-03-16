@@ -38,3 +38,19 @@ def ensure_user_columns():
             except Exception:
                 conn.rollback()
                 pass
+
+
+def ensure_document_columns():
+    """Add missing columns to documents table if they were added to the model later."""
+    with engine.connect() as conn:
+        for column_sql in [
+            "ALTER TABLE documents ADD COLUMN status VARCHAR DEFAULT 'processing'",
+            "ALTER TABLE documents ADD COLUMN uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP",
+            "ALTER TABLE documents ADD COLUMN expires_at DATETIME",
+        ]:
+            try:
+                conn.execute(text(column_sql))
+                conn.commit()
+            except Exception:
+                conn.rollback()
+                pass

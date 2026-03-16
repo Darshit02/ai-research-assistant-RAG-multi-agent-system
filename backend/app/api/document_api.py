@@ -67,11 +67,18 @@ def upload_pdf(
 def ask_question(
     request: Request,
     question: str,
+    session_id: int,document_ids: list[int],
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
 
-    result = generate_answer(question, current_user.id, db)
+    result = generate_answer(
+        question,
+        current_user.id,
+        session_id,
+        document_ids,
+        db,
+    )
 
     return result
 
@@ -230,6 +237,7 @@ def document_stats(
         {
             "id": d.id,
             "filename": d.filename,
+            "document_id": "" ,
             "status": d.status,
             "uploaded_at": d.uploaded_at
         }
@@ -251,6 +259,7 @@ def update_settings(
     db.commit()
 
     return {"message": "Settings updated"}
+
 
 @router.get("/highlight")
 def highlight_text(

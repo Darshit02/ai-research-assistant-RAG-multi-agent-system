@@ -10,7 +10,8 @@ def store_embeddings(chunks, embeddings, document_id):
     metadatas = [
         {
             "document_id": document_id,
-            "page": chunk["page"]
+            "page": chunk["page"],
+            "document_name": chunk.get("document_name"),
         }
         for chunk in chunks
     ]
@@ -42,7 +43,7 @@ def search_similar_chunks(query_embedding, document_ids, n_results=5):
         chunks.append({
             "text": doc,
             "page": meta["page"],
-            "document_name": meta["document_name"],
+            "document_name": meta.get("document_name"),
             "document_id": meta["document_id"]
         })
 

@@ -1,13 +1,18 @@
-from sqlalchemy import Column, ForeignKey,Integer,String ,DateTime
-from datetime import datetime 
+from sqlalchemy import Column, ForeignKey, Integer, String, DateTime ,Text
+from datetime import datetime
 from ..db import Base
+
 
 class Document(Base):
     __tablename__ = "documents"
-    id = Column(Integer , primary_key=True , index=True)
-    filename = Column(String , nullable=False)
-    filepath  = Column(String , nullable=False)
-    user_id = Column(Integer , ForeignKey("users.id"))
+
+    id = Column(Integer, primary_key=True)
+    filename = Column(String)
+    filepath = Column(String)
+    user_id = Column(Integer)
     status = Column(String, default="processing")
-    uploaded_id = Column(DateTime,default=datetime.utcnow)
+    summary = Column(Text, nullable=True)
+    title = Column(String, nullable=True)
+    key_points = Column(Text, nullable=True)
+    uploaded_at = Column(DateTime, default=datetime.utcnow)
     expires_at = Column(DateTime)

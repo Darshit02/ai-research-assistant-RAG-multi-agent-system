@@ -10,6 +10,9 @@ def keyword_search(question, chunks, top_k=5):
 
     corpus = [chunk["text"] for chunk in chunks]
 
+    if not corpus:
+        return []
+
     tokenized_corpus = [tokenize(doc) for doc in corpus]
 
     bm25 = BM25Okapi(tokenized_corpus)
