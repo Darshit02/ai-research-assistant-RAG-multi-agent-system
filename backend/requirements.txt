@@ -37,3 +37,5 @@ tiktoken
 rank-bm25
 redis
 slowapi
+
+psutil

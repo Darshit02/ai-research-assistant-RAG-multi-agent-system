@@ -23,9 +23,11 @@ from app.database.models.usage import Usage
 router = APIRouter()
 
 UPLOAD_DIR = "uploads"
-
+MAX_FILE_SIZE = 20 * 1024 * 1024
 
 # List User Documents
+
+
 @router.get("/")
 def document_stats(
     db: Session = Depends(get_db),
@@ -52,7 +54,7 @@ def document_stats(
 
 @router.get("/{document_id}")
 def get_document(
-    document_id: int,
+    document_id: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -78,7 +80,7 @@ def get_document(
 
 @router.delete("/{document_id}")
 def delete_document(
-    document_id: int,
+    document_id: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -108,6 +110,8 @@ def upload_pdf(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    if file.size > MAX_FILE_SIZE:
+        raise HTTPException(400, "File too large")
 
     file_path = os.path.join(UPLOAD_DIR, file.filename)
     with open(file_path, "wb") as buffer:
@@ -142,7 +146,8 @@ def upload_pdf(
 def ask_question(
     request: Request,
     question: str,
-    session_id: int, document_ids: list[int],
+    session_id: str,
+    document_ids: list[str],
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -181,9 +186,11 @@ def create_session(
     }
 
 # change language dropdown
+
+
 @router.put("/sessions/{session_id}/language")
 def change_language(
-    session_id: int,
+    session_id: str,
     language: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -204,6 +211,8 @@ def change_language(
     return {"message": "Language updated"}
 
 # all chats or sessions
+
+
 @router.get("/get-all-sessions")
 def chat_stats(
     db: Session = Depends(get_db),
@@ -227,7 +236,7 @@ def chat_stats(
 
 @router.get("/messages/{session_id}")
 def get_messages(
-    session_id: int,
+    session_id: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -250,7 +259,7 @@ def get_messages(
 
 @router.delete("/sessions/{session_id}")
 def delete_session(
-    session_id: int,
+    session_id: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -371,7 +380,7 @@ def update_settings(
 
 @router.get("/highlight")
 def highlight_text(
-    document_id: int,
+    document_id: str,
     page: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -389,6 +398,7 @@ def highlight_text(
         "file_url": f"/pdf/{document.filename}",
         "page": page
     }
+
 
 @router.get("/usage")
 def get_usage(

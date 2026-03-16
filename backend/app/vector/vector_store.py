@@ -49,7 +49,7 @@ def search_similar_chunks(query_embedding, document_ids, n_results=5):
 
     return chunks
 
-def delete_document_embeddings(document_id: int):
+def delete_document_embeddings(document_id: str):
 
     ids = collection.get(
         where={"document_id": document_id}

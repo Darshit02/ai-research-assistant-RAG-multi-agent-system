@@ -1,4 +1,6 @@
-from sqlalchemy import Column, Integer, Text, DateTime, ForeignKey, String
+import uuid
+
+from sqlalchemy import Column, DateTime, ForeignKey, String, Text
 from datetime import datetime
 from app.database.db import Base
 
@@ -6,9 +8,9 @@ from app.database.db import Base
 class ChatMessage(Base):
     __tablename__ = "chat_messages"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(String(36), primary_key=True, index=True, default=lambda: str(uuid.uuid4()))
 
-    session_id = Column(Integer, ForeignKey("chat_sessions.id"))
+    session_id = Column(String(36), ForeignKey("chat_sessions.id"), index=True)
 
     role = Column(String)  # user / assistant
 

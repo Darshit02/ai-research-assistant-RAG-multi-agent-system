@@ -1,4 +1,6 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey
+import uuid
+
+from sqlalchemy import Column, DateTime, ForeignKey, String, Text
 from datetime import datetime
 
 from app.database.db import Base
@@ -8,8 +10,8 @@ from app.database.db import Base
 class ChatHistory(Base):
     __tablename__ = "chat_history"
 
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"))
+    id = Column(String(36), primary_key=True, index=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String(36), ForeignKey("users.id"), index=True)
     question = Column(Text)
     embedding = Column(Text)
     answer = Column(Text)

@@ -23,6 +23,8 @@ def _authenticate_and_token(email: str, password: str, db: Session):
     token = create_access_token({"sub": db_user.email})
     return {"access_token": token, "token_type": "bearer"}
 
+
+
 @router.post("/register")
 def register(user:UserRegister ,db:Session = Depends(get_db)):
     existing_user = db.query(User).filter(User.email == user.email).first()

@@ -19,11 +19,12 @@ from app.services.response_parser import parse_structured_answer
 from app.services.query_planner import plan_queries
 from app.services.token_counter import estimate_tokens
 from app.services.query_translation import translate_query
+from app.database.models.chat_session import ChatSession
 
 DEFAULT_MODEL = "models/gemini-2.5-flash"
 
 
-def _get_model(db, user_id: int):
+def _get_model(db, user_id: str):
     """Configure genai and return a GenerativeModel for the given user (API key + preferred model)."""
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
@@ -33,7 +34,7 @@ def _get_model(db, user_id: int):
     return genai.GenerativeModel(user.preferred_model or DEFAULT_MODEL)
 
 
-def generate_answer(question: str, user_id: int, session_id: int, db, document_ids: list[int],):
+def generate_answer(question: str, user_id: str, session_id: str, db, document_ids: list[str]):
     question_embedding = create_embeddings([question])[0]
     history_cache = db.query(ChatHistory).filter(
         ChatHistory.user_id == user_id
@@ -41,7 +42,6 @@ def generate_answer(question: str, user_id: int, session_id: int, db, document_i
     session = db.query(ChatSession).filter(
         ChatSession.id == session_id
     ).first()
-
     language = session.language
     for record in history_cache:
         old_embedding = json.loads(record.embedding)
@@ -256,7 +256,7 @@ Conclusion:
     }
 
 
-def stream_answer(question: str, user_id: int, db):
+def stream_answer(question: str, user_id: str, db):
 
     docs = db.query(Document).filter(Document.user_id == user_id).all()
     document_ids = [doc.id for doc in docs]

@@ -8,7 +8,7 @@ from app.services.document_intelligence import generate_document_insights
 from app.rag.generator import _get_model
 
 
-def ingest_document(file_path: str, document_id: int):
+def ingest_document(file_path: str, document_id: str):
     db_session = SessionLocal()
     try:
         doc = db_session.query(Document).filter(
