@@ -3,16 +3,22 @@ import os
 
 import google.generativeai as genai
 from collections import defaultdict
-from app.services.query_planner import plan_queries
+
 from app.database.models.chat import ChatHistory
 from app.database.models.chat_messages import ChatMessage
 from app.database.models.document import Document
 from app.database.models.model import User
+from app.database.models.usage import Usage
+
 from app.rag.retrieval import retrieve_context
+
 from app.services.embedding_service import create_embeddings
 from app.services.similarity import cosine_similarity
 from app.services.retrieval_memory import get_cached_chunks, store_retrieval_memory
 from app.services.response_parser import parse_structured_answer
+from app.services.query_planner import plan_queries
+from app.services.token_counter import estimate_tokens
+from app.services.query_translation import translate_query
 
 DEFAULT_MODEL = "models/gemini-2.5-flash"
 
@@ -27,12 +33,16 @@ def _get_model(db, user_id: int):
     return genai.GenerativeModel(user.preferred_model or DEFAULT_MODEL)
 
 
-def generate_answer(question: str, user_id: int, session_id: int, db ,document_ids: list[int],):
+def generate_answer(question: str, user_id: int, session_id: int, db, document_ids: list[int],):
     question_embedding = create_embeddings([question])[0]
     history_cache = db.query(ChatHistory).filter(
         ChatHistory.user_id == user_id
     ).all()
+    session = db.query(ChatSession).filter(
+        ChatSession.id == session_id
+    ).first()
 
+    language = session.language
     for record in history_cache:
         old_embedding = json.loads(record.embedding)
         similarity = cosine_similarity(
@@ -73,8 +83,6 @@ def generate_answer(question: str, user_id: int, session_id: int, db ,document_i
             ),
         }
 
-    
-
     model = _get_model(db, user_id)
     cached_chunks = get_cached_chunks(
         session_id,
@@ -85,11 +93,18 @@ def generate_answer(question: str, user_id: int, session_id: int, db ,document_i
     if cached_chunks:
         context_chunks = cached_chunks
     else:
-        sub_questions = plan_queries(question, model)
+        english_question = translate_query(question, model)
+
+        sub_questions_original = plan_queries(question, model)
+        sub_questions_english = plan_queries(english_question, model)
 
         all_chunks = []
 
-        for q in sub_questions:
+        for q in sub_questions_original:
+            chunks = retrieve_context(q, document_ids)
+            all_chunks.extend(chunks)
+
+        for q in sub_questions_english:
             chunks = retrieve_context(q, document_ids)
             all_chunks.extend(chunks)
 
@@ -184,6 +199,15 @@ Conclusion:
     response = model.generate_content(final_prompt)
 
     answer = response.candidates[0].content.parts[0].text
+    tokens_used = estimate_tokens(question + answer)
+    usage = Usage(
+        user_id=user_id,
+        model="gemini-2.5-flash",
+        tokens=tokens_used
+    )
+
+    db.add(usage)
+    db.commit()
     structured = parse_structured_answer(answer)
     top_evidence = context_chunks[:3]
 

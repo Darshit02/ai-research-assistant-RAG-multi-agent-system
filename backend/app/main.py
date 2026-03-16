@@ -10,6 +10,7 @@ from app.database.models.chat_messages import ChatMessage
 from app.database.models.chat_session import ChatSession
 from app.database.models.model import Base, User
 from app.core.limiter import limiter
+from app.api import system_api
 
 
 app = FastAPI(title="Research Assistant")
@@ -21,6 +22,7 @@ Base.metadata.create_all(bind=engine)
 ensure_user_columns()
 ensure_document_columns()
 app.include_router(auth.router)
+app.include_router(system_api.router)
 app.include_router(
     document_api.router,
     prefix="/documents",

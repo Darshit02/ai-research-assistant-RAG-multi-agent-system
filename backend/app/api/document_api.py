@@ -17,6 +17,7 @@ from app.database.models.chat_session import ChatSession
 from app.vector.vector_store import delete_document_embeddings
 from app.core.limiter import limiter
 from app.database.models.chat_messages import ChatMessage
+from app.database.models.usage import Usage
 
 
 router = APIRouter()
@@ -166,7 +167,8 @@ def create_session(
 ):
 
     session = ChatSession(
-        user_id=current_user.id
+        user_id=current_user.id,
+        language="English"
     )
 
     db.add(session)
@@ -174,12 +176,34 @@ def create_session(
     db.refresh(session)
 
     return {
-        "session_id": session.id
+        "session_id": session.id,
+        "language": session.language
     }
 
+# change language dropdown
+@router.put("/sessions/{session_id}/language")
+def change_language(
+    session_id: int,
+    language: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+
+    session = db.query(ChatSession).filter(
+        ChatSession.id == session_id,
+        ChatSession.user_id == current_user.id
+    ).first()
+
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    session.language = language
+
+    db.commit()
+
+    return {"message": "Language updated"}
+
 # all chats or sessions
-
-
 @router.get("/get-all-sessions")
 def chat_stats(
     db: Session = Depends(get_db),
@@ -364,4 +388,21 @@ def highlight_text(
     return {
         "file_url": f"/pdf/{document.filename}",
         "page": page
+    }
+
+@router.get("/usage")
+def get_usage(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+
+    records = db.query(Usage).filter(
+        Usage.user_id == current_user.id
+    ).all()
+
+    total_tokens = sum(r.tokens for r in records)
+
+    return {
+        "requests": len(records),
+        "tokens_used": total_tokens
     }
