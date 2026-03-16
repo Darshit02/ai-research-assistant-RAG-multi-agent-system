@@ -1,0 +1,36 @@
+version: "2"
+
+services:
+  backend:
+    build: .
+    container_name: ai_research_backend
+    ports:
+      - "8000:8000"
+
+    depends_on:
+      - db
+
+    volumes:
+      - ./uploads:/app/uploads
+      - ./vector_store:/app/vector_store
+
+    env_file:
+      - .env
+
+  db:
+    image: postgres:15
+    container_name: ai_research_db
+
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: research_db
+
+    ports:
+      - "5432:5432"
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
