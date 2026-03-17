@@ -26,12 +26,17 @@ def store_embeddings(chunks, embeddings, document_id):
 
 
 def search_similar_chunks(query_embedding, document_ids, n_results=5):
-
-    results = collection.query(
-        query_embeddings=[query_embedding.tolist()],
-        n_results=n_results,
-        where={"document_id": {"$in": document_ids}}
-    )
+    if document_ids:
+        results = collection.query(
+            query_embeddings=[query_embedding.tolist()],
+            n_results=n_results,
+            where={"document_id": {"$in": document_ids}}
+        )
+    else:
+        results = collection.query(
+            query_embeddings=[query_embedding.tolist()],
+            n_results=n_results,
+        )
 
     documents = results["documents"][0]
     metadatas = results["metadatas"][0]

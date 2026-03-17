@@ -17,7 +17,18 @@ from app.api import system_api
 from app.api.admin import admin_api
 
 
+from fastapi.middleware.cors import CORSMiddleware
+
 app = FastAPI(title="Research Assistant")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 app.state.limiter = limiter
 app.add_middleware(SlowAPIMiddleware)
 

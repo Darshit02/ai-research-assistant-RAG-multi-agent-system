@@ -21,7 +21,7 @@ from app.services.token_counter import estimate_tokens
 from app.services.query_translation import translate_query
 from app.database.models.chat_session import ChatSession
 
-DEFAULT_MODEL = "models/gemini-2.5-flash"
+DEFAULT_MODEL = "models/gemini-2.5-pro"
 
 
 def _get_model(db, user_id: str):

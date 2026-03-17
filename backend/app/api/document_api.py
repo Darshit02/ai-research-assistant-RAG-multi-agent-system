@@ -25,15 +25,12 @@ router = APIRouter()
 UPLOAD_DIR = "uploads"
 MAX_FILE_SIZE = 20 * 1024 * 1024
 
-# List User Documents
-
 
 @router.get("/")
 def document_stats(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-
     docs = db.query(Document).filter(
         Document.user_id == current_user.id
     ).all()
@@ -49,59 +46,44 @@ def document_stats(
         for d in docs
     ]
 
-# Document Details
-
-
-@router.get("/{document_id}")
-def get_document(
-    document_id: str,
+@router.get("/analytics")
+def dashboard_analytics(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-
-    document = db.query(Document).filter(
-        Document.id == document_id,
+    total_documents = db.query(Document).filter(
         Document.user_id == current_user.id
-    ).first()
+    ).count()
 
-    if not document:
-        raise HTTPException(status_code=404, detail="Document not found")
+    total_chats = db.query(ChatSession).filter(
+        ChatSession.user_id == current_user.id
+    ).count()
+
+    total_messages = db.query(ChatMessage).join(ChatSession).filter(
+        ChatSession.user_id == current_user.id
+    ).count()
 
     return {
-        "id": document.id,
-        "filename": document.filename,
-        "filepath": document.filepath,
-        "status": document.status,
-        "uploaded_at": document.uploaded_at
+        "documents": total_documents,
+        "chat_sessions": total_chats,
+        "messages": total_messages
     }
 
-# delete document
-
-
-@router.delete("/{document_id}")
-def delete_document(
-    document_id: str,
+@router.get("/usage")
+def get_usage(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    document = db.query(Document).filter(
-        Document.id == document_id,
-        Document.user_id == current_user.id
-    ).first()
-    if not document:
-        raise HTTPException(status_code=404, detail="Document not found")
+    records = db.query(Usage).filter(
+        Usage.user_id == current_user.id
+    ).all()
 
-    if os.path.exists(document.filepath):
-        os.remove(document.filepath)
-    delete_document_embeddings(document.id)
+    total_tokens = sum(r.tokens for r in records)
 
-    db.delete(document)
-    db.commit()
-
-    return {"message": "Document deleted successfully"}
-
-# document upload
-
+    return {
+        "requests": len(records),
+        "tokens_used": total_tokens
+    }
 
 @router.post("/upload")
 def upload_pdf(
@@ -140,164 +122,12 @@ def upload_pdf(
         "expires_at": expires_at
     }
 
-
-@router.post("/ask")
-@limiter.limit("10/minute")
-def ask_question(
-    request: Request,
-    question: str,
-    session_id: str,
-    document_ids: list[str],
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-
-    result = generate_answer(
-        question,
-        current_user.id,
-        session_id,
-        document_ids,
-        db,
-    )
-
-    return result
-
-# chat new session
-
-
-@router.post("/sessions")
-def create_session(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-
-    session = ChatSession(
-        user_id=current_user.id,
-        language="English"
-    )
-
-    db.add(session)
-    db.commit()
-    db.refresh(session)
-
-    return {
-        "session_id": session.id,
-        "language": session.language
-    }
-
-# change language dropdown
-
-
-@router.put("/sessions/{session_id}/language")
-def change_language(
-    session_id: str,
-    language: str,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-
-    session = db.query(ChatSession).filter(
-        ChatSession.id == session_id,
-        ChatSession.user_id == current_user.id
-    ).first()
-
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
-
-    session.language = language
-
-    db.commit()
-
-    return {"message": "Language updated"}
-
-# all chats or sessions
-
-
-@router.get("/get-all-sessions")
-def chat_stats(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-
-    sessions = db.query(ChatSession).filter(
-        ChatSession.user_id == current_user.id
-    ).all()
-
-    return [
-        {
-            "session_id": s.id,
-            "created_at": s.created_at
-        }
-        for s in sessions
-    ]
-
-#  chat message history
-
-
-@router.get("/messages/{session_id}")
-def get_messages(
-    session_id: str,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-
-    messages = db.query(ChatMessage).filter(
-        ChatMessage.session_id == session_id
-    ).all()
-
-    return [
-        {
-            "role": m.role,
-            "content": m.content,
-            "created_at": m.created_at
-        }
-        for m in messages
-    ]
-
-# session delete / delete chat history
-
-
-@router.delete("/sessions/{session_id}")
-def delete_session(
-    session_id: str,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-
-    session = db.query(ChatSession).filter(
-        ChatSession.id == session_id,
-        ChatSession.user_id == current_user.id
-    ).first()
-
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
-
-    db.delete(session)
-    db.commit()
-
-    return {"message": "Session deleted"}
-
-
-@router.post("/ask-stream")
-def ask_stream(
-    question: str,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-
-    generator = stream_answer(question, current_user.id, db)
-
-    return StreamingResponse(generator, media_type="text/plain")
-
-
-# Document Search
 @router.get("/search")
 def search_documents(
     query: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-
     documents = db.query(Document).filter(
         Document.user_id == current_user.id,
         Document.filename.ilike(f"%{query}%")
@@ -320,7 +150,6 @@ def search_chat(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-
     messages = db.query(ChatMessage).join(ChatSession).filter(
         ChatSession.user_id == current_user.id,
         ChatMessage.content.ilike(f"%{query}%")
@@ -336,48 +165,6 @@ def search_chat(
         for msg in messages
     ]
 
-
-@router.get("/analytics")
-def dashboard_analytics(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-
-    total_documents = db.query(Document).filter(
-        Document.user_id == current_user.id
-    ).count()
-
-    total_chats = db.query(ChatSession).filter(
-        ChatSession.user_id == current_user.id
-    ).count()
-
-    total_messages = db.query(ChatMessage).join(ChatSession).filter(
-        ChatSession.user_id == current_user.id
-    ).count()
-
-    return {
-        "documents": total_documents,
-        "chat_sessions": total_chats,
-        "messages": total_messages
-    }
-
-
-@router.put("/settings")
-def update_settings(
-    model: str,
-    api_key: str,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-
-    current_user.preferred_model = model
-    current_user.api_key = api_key
-
-    db.commit()
-
-    return {"message": "Settings updated"}
-
-
 @router.get("/highlight")
 def highlight_text(
     document_id: str,
@@ -385,7 +172,6 @@ def highlight_text(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-
     document = db.query(Document).filter(
         Document.id == document_id,
         Document.user_id == current_user.id
@@ -399,20 +185,196 @@ def highlight_text(
         "page": page
     }
 
-
-@router.get("/usage")
-def get_usage(
+@router.put("/settings")
+def update_settings(
+    model: str,
+    api_key: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    current_user.preferred_model = model
+    current_user.api_key = api_key
 
-    records = db.query(Usage).filter(
-        Usage.user_id == current_user.id
-    ).all()
+    db.commit()
 
-    total_tokens = sum(r.tokens for r in records)
+    return {"message": "Settings updated"}
+
+
+# ────────────────────────────── SESSIONS ──────────────────────────────
+
+@router.post("/sessions")
+def create_session(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    session = ChatSession(
+        user_id=current_user.id,
+        language="English"
+    )
+
+    db.add(session)
+    db.commit()
+    db.refresh(session)
 
     return {
-        "requests": len(records),
-        "tokens_used": total_tokens
+        "session_id": session.id,
+        "language": session.language
     }
+
+
+@router.get("/get-all-sessions")
+def chat_stats(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    sessions = db.query(ChatSession).filter(
+        ChatSession.user_id == current_user.id
+    ).all()
+
+    return [
+        {
+            "session_id": s.id,
+            "created_at": s.created_at
+        }
+        for s in sessions
+    ]
+
+
+@router.put("/sessions/{session_id}/language")
+def change_language(
+    session_id: str,
+    language: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    session = db.query(ChatSession).filter(
+        ChatSession.id == session_id,
+        ChatSession.user_id == current_user.id
+    ).first()
+
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    session.language = language
+
+    db.commit()
+
+    return {"message": "Language updated"}
+
+
+@router.delete("/sessions/{session_id}")
+def delete_session(
+    session_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    session = db.query(ChatSession).filter(
+        ChatSession.id == session_id,
+        ChatSession.user_id == current_user.id
+    ).first()
+
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    db.delete(session)
+    db.commit()
+
+    return {"message": "Session deleted"}
+
+@router.get("/messages/{session_id}")
+def get_messages(
+    session_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    messages = db.query(ChatMessage).filter(
+        ChatMessage.session_id == session_id
+    ).all()
+
+    return [
+        {
+            "role": m.role,
+            "content": m.content,
+            "created_at": m.created_at
+        }
+        for m in messages
+    ]
+
+@router.post("/ask")
+@limiter.limit("10/minute")
+def ask_question(
+    request: Request,
+    question: str,
+    session_id: str,
+    document_ids: list[str] = [],
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    result = generate_answer(
+        question,
+        current_user.id,
+        session_id,
+        db,
+        document_ids,
+    )
+
+    return result
+
+
+@router.post("/ask-stream")
+def ask_stream(
+    question: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    generator = stream_answer(question, current_user.id, db)
+
+    return StreamingResponse(generator, media_type="text/plain")
+
+
+# ────────────────────────────── DOCUMENT DETAIL / DELETE (wildcard LAST) ──
+
+@router.get("/{document_id}")
+def get_document(
+    document_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    document = db.query(Document).filter(
+        Document.id == document_id,
+        Document.user_id == current_user.id
+    ).first()
+
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    return {
+        "id": document.id,
+        "filename": document.filename,
+        "filepath": document.filepath,
+        "status": document.status,
+        "uploaded_at": document.uploaded_at
+    }
+
+
+@router.delete("/{document_id}")
+def delete_document(
+    document_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    document = db.query(Document).filter(
+        Document.id == document_id,
+        Document.user_id == current_user.id
+    ).first()
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    if os.path.exists(document.filepath):
+        os.remove(document.filepath)
+    delete_document_embeddings(document.id)
+
+    db.delete(document)
+    db.commit()
+
+    return {"message": "Document deleted successfully"}
