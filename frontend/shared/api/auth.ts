@@ -14,6 +14,7 @@ export const authApi = {
     api.get<{ 
       id: string; 
       email: string; 
+      role: string;
       preferred_model?: string;
       gemini_api_key?: string;
       openai_api_key?: string;

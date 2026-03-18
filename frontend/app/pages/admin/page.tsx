@@ -59,7 +59,7 @@ export default function AdminPage() {
       <AppSidebar />
       <div className="flex-1 overflow-y-auto w-full">
         <div className="p-8 max-w-6xl mx-auto space-y-8 animate-[fade-in_0.5s_ease-out]">
-          
+
           <div className="mb-8 flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold tracking-tight mb-2 flex items-center gap-3">
@@ -81,19 +81,19 @@ export default function AdminPage() {
           </div>
 
           <div className="flex gap-2 border-b border-border mb-6">
-            <button 
+            <button
               onClick={() => setActiveTab("overview")}
               className={`px-4 py-2 border-b-2 font-medium text-sm transition-colors ${activeTab === "overview" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
             >
               Overview
             </button>
-            <button 
+            <button
               onClick={() => setActiveTab("users")}
               className={`px-4 py-2 border-b-2 font-medium text-sm transition-colors ${activeTab === "users" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
             >
               Users ({users.length})
             </button>
-            <button 
+            <button
               onClick={() => setActiveTab("docs")}
               className={`px-4 py-2 border-b-2 font-medium text-sm transition-colors ${activeTab === "docs" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
             >

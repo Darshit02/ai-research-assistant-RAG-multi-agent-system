@@ -45,7 +45,8 @@ import {
 } from "@/shared/components/ui/sheet";
 import { authApi } from "@/shared/api/auth";
 import { toast } from "sonner";
-import { Send, Plus, MessageSquare, Trash2, Library, CheckSquare, Square, Bot, Eye, Settings2, Sparkles, Globe, Loader2 } from "lucide-react";
+import { Send, Plus, MessageSquare, Trash2, Library, CheckSquare, Square, Bot, Eye, Settings2, Sparkles, Globe, Loader2, CircleFadingPlus } from "lucide-react";
+import { Separator } from "@/shared/components/ui/separator";
 
 function ChatPage() {
   const dispatch = useDispatch();
@@ -208,7 +209,7 @@ function ChatPage() {
 
     const question = input.trim();
     setInput("");
-      dispatch(appendMessage({
+    dispatch(appendMessage({
       sessionId: activeSessionId,
       message: { role: "user", content: question, created_at: new Date().toISOString() }
     }));
@@ -232,7 +233,7 @@ function ChatPage() {
       }
       // Use pre-formatted answer from backend, or fallback to defensive formatting if needed
       let formattedContent = (res.data as any).answer || "";
-      
+
       if (!formattedContent.trim()) {
         if (res.data.summary?.trim()) formattedContent += `### Summary\n${res.data.summary.trim()}\n\n`;
         if (res.data.key_findings?.trim()) formattedContent += `### Key Findings\n${res.data.key_findings.trim()}\n\n`;
@@ -271,23 +272,18 @@ function ChatPage() {
   return (
     <div className="flex h-screen overflow-hidden bg-background font-sans">
       <AppSidebar />
-
-      {/* Chat Layout Container */}
       <div className="flex-1 flex overflow-hidden">
-
-        {/* Left Sub-Sidebar (Sessions & Docs) */}
         <div className="w-72 border-r border-border bg-muted/30 hidden md:flex flex-col">
-
-          {/* New Chat Button */}
-          <div className="p-4 border-b border-border">
-            <Button onClick={handleCreateSession} className="w-full gap-2 shadow-sm font-medium rounded-xl h-11">
-              <Plus size={18} /> New Chat
+          <div className="px-4 py-3 border-b text-white  border-border">
+            <Button onClick={handleCreateSession} className="w-full cursor-pointer gap-2 font-medium rounded-md h-10">
+              <CircleFadingPlus size={20} />
+              <span className="text-md ">
+                New Chat
+              </span>
             </Button>
           </div>
-
-          {/* Sessions List */}
           <div className="flex-1 overflow-y-auto p-3 space-y-1">
-            <h3 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-3 px-2 mt-2">
+            <h3 className="text-[12px] font-bold text-muted-foreground capitalize tracking-widest mb-3 px-2 mt-2">
               Recent Activity
             </h3>
             {sessions.length === 0 ? (
@@ -298,13 +294,32 @@ function ChatPage() {
                   key={sess.session_id}
                   onClick={() => dispatch(setActiveSession(sess.session_id))}
                   onDoubleClick={(e) => startRenaming(e, sess)}
-                  className={`group flex items-center justify-between px-3 py-3 rounded-xl cursor-pointer transition-all duration-200 border border-transparent ${activeSessionId === sess.session_id
-                      ? "bg-primary/10 text-primary font-semibold border-primary/20 shadow-sm"
-                      : "text-foreground hover:bg-muted"
+                  className={`group flex items-center justify-between px-3 py-3 rounded-md  cursor-pointer transition-all duration-200 border ${activeSessionId === sess.session_id
+                    ? "bg-primary/10 text-primary font-semibold border-primary/20"
+                    : "text-foreground hover:bg-muted"
                     }`}
                 >
                   <div className="flex items-center gap-3 truncate flex-1">
-                    <MessageSquare size={16} className={activeSessionId === sess.session_id ? "opacity-100" : "opacity-40"} />
+                    {activeSessionId === sess.session_id ? (
+                      <span className="text-primary">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M22 10V13C22 17 20 19 16 19H15.5C15.19 19 14.89 19.15 14.7 19.4L13.2 21.4C12.54 22.28 11.46 22.28 10.8 21.4L9.3 19.4C9.14 19.18 8.77 19 8.5 19H8C4 19 2 18 2 13V8C2 4 4 2 8 2H14" stroke="currentColor" stroke-width="1.5" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round" />
+                          <path d="M19.5 7C20.8807 7 22 5.88071 22 4.5C22 3.11929 20.8807 2 19.5 2C18.1193 2 17 3.11929 17 4.5C17 5.88071 18.1193 7 19.5 7Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                          <path d="M15.9965 11H16.0054" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                          <path d="M11.9955 11H12.0045" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                          <path d="M7.99451 11H8.00349" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M8.5 19H8C4 19 2 18 2 13V8C2 4 4 2 8 2H16C20 2 22 4 22 8V13C22 17 20 19 16 19H15.5C15.19 19 14.89 19.15 14.7 19.4L13.2 21.4C12.54 22.28 11.46 22.28 10.8 21.4L9.3 19.4C9.14 19.18 8.77 19 8.5 19Z" stroke="currentColor" stroke-width="1.5" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round" />
+                          <path d="M15.9965 11H16.0054" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                          <path d="M11.9955 11H12.0045" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                          <path d="M7.99451 11H8.00349" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                      </span>
+                    )}
                     {editingSessionId === sess.session_id ? (
                       <Input
                         autoFocus
@@ -323,7 +338,7 @@ function ChatPage() {
                   </div>
                   <button
                     onClick={(e) => handleDeleteSession(e, sess.session_id)}
-                    className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-destructive/10 hover:text-destructive rounded-lg transition-all"
+                    className=" cursor-pointer p-1.5 hover:bg-destructive/10 hover:text-destructive rounded-lg transition-all"
                   >
                     <Trash2 size={14} />
                   </button>
@@ -331,16 +346,24 @@ function ChatPage() {
               ))
             )}
           </div>
-
-          {/* Document Context Selector */}
           <div className="h-[40%] border-t border-border bg-background/50 p-4 flex flex-col">
             <h3 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-4 flex items-center gap-2">
-              <Library size={14} className="text-primary/70" />
-              Source Knowledge
+              <span className="text-primary">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M3.5 18V7C3.5 3 4.5 2 8.5 2H15.5C19.5 2 20.5 3 20.5 7V17C20.5 17.14 20.5 17.28 20.49 17.42" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                  <path d="M6.35 15H20.5V18.5C20.5 20.43 18.93 22 17 22H7C5.07 22 3.5 20.43 3.5 18.5V17.85C3.5 16.28 4.78 15 6.35 15Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                  <path d="M8 7H16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                  <path d="M8 10.5H13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+              </span>
+              <h3 className="text-[12px] font-bold text-muted-foreground capitalize tracking-widest px-2">
+                Source Knowledge
+              </h3>
             </h3>
+            <Separator className="my-2" />
             <div className="flex-1 overflow-y-auto space-y-1.5 pr-1 custom-scrollbar">
               {readyDocs.length === 0 ? (
-                <div className="text-center py-6 bg-muted/20 rounded-xl border border-dashed border-border">
+                <div className="text-center py-6 bg-muted/20 rounded-md border border-dashed border-border">
                   <p className="text-[11px] text-muted-foreground">Go to dashboard to upload documents</p>
                 </div>
               ) : (
@@ -349,9 +372,9 @@ function ChatPage() {
                   return (
                     <div
                       key={doc.id}
-                      className={`group flex items-center gap-2 p-2.5 rounded-xl cursor-pointer text-sm transition-all duration-200 border ${isSelected
-                          ? "bg-primary/5 text-primary border-primary/20 shadow-sm"
-                          : "hover:bg-muted border-transparent text-muted-foreground"
+                      className={`group flex items-center gap-2 p-2.5 rounded-md cursor-pointer text-sm transition-all duration-200 border ${isSelected
+                        ? "bg-primary/5 text-primary border-primary/20"
+                        : "hover:bg-muted border-transparent text-muted-foreground"
                         }`}
                     >
                       <div
@@ -367,7 +390,7 @@ function ChatPage() {
                           setViewingDoc(doc);
                           setViewingPage(1);
                         }}
-                        className="p-1.5 hover:bg-primary/10 hover:text-primary rounded-lg opacity-0 group-hover:opacity-100 transition-all"
+                        className="p-1.5 cursor-pointer hover:bg-primary/10 hover:text-primary rounded-md opacity-0 group-hover:opacity-100 transition-all"
                         title="View PDF"
                       >
                         <Eye size={14} />
@@ -387,10 +410,13 @@ function ChatPage() {
           <header className="h-16 border-b border-border flex items-center px-8 bg-background/90 backdrop-blur-md z-10 sticky top-0 justify-between">
             <div className="flex items-center gap-4">
               <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary border border-primary/10">
-                <Bot size={22} className="animate-pulse-slow" />
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M18.47 16.83L18.86 19.99C18.96 20.82 18.07 21.4 17.36 20.97L13.17 18.48C12.71 18.48 12.26 18.45 11.82 18.39C12.56 17.52 13 16.42 13 15.23C13 12.39 10.54 10.09 7.49997 10.09C6.33997 10.09 5.26997 10.42 4.37997 11C4.34997 10.75 4.33997 10.5 4.33997 10.24C4.33997 5.68999 8.28997 2 13.17 2C18.05 2 22 5.68999 22 10.24C22 12.94 20.61 15.33 18.47 16.83Z" stroke="#292D32" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                  <path d="M13 15.23C13 16.42 12.56 17.5201 11.82 18.3901C10.83 19.5901 9.26 20.36 7.5 20.36L4.89 21.91C4.45 22.18 3.89 21.81 3.95 21.3L4.2 19.3301C2.86 18.4001 2 16.91 2 15.23C2 13.47 2.94 11.9201 4.38 11.0001C5.27 10.4201 6.34 10.0901 7.5 10.0901C10.54 10.0901 13 12.39 13 15.23Z" stroke="#292D32" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
               </div>
               <div className="flex flex-col">
-                <span className="font-bold text-sm tracking-tight">
+                <span className="font-bold text-lg tracking-tight">
                   {activeSessionId ? (sessions.find(s => s.session_id === activeSessionId)?.title || `Session ${activeSessionId.substring(0, 8)}`) : "AI Research Hub"}
                 </span>
                 <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">
@@ -404,21 +430,19 @@ function ChatPage() {
               {activeSessionId && (
                 <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
                   <DialogTrigger asChild>
-                    <Button variant="outline" className="h-9 px-4 gap-2 rounded-xl border-border bg-muted/30 hover:bg-muted/50 transition-all hover:scale-[1.02] active:scale-[0.98]">
+                    <Button variant="outline" className="h-9 px-4 gap-2 rounded-md border-border bg-muted/30 hover:bg-muted/50 cursor-pointer">
                       <Settings2 size={16} className="text-primary" />
                       <span className="text-[10px] font-black uppercase tracking-widest">Intelligence Settings</span>
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="sm:max-w-[425px] rounded-[2rem] border-border shadow-2xl glass-card">
-                    <DialogHeader className="mb-4">
+                  <DialogContent className="sm:max-w-[425px] border-border shadow-2xl">
+                    <DialogHeader className="">
                       <DialogTitle className="flex items-center gap-3 text-xl font-bold">
-                        <div className="p-2 bg-primary/10 text-primary rounded-xl">
-                          <Bot size={20} />
-                        </div>
                         Chat Intelligence
                       </DialogTitle>
                     </DialogHeader>
 
+                    <Separator />
                     <div className="grid gap-8 py-2">
                       {/* Model Selection */}
                       <div className="space-y-3">
@@ -430,7 +454,7 @@ function ChatPage() {
                           value={currentModel}
                           onValueChange={(val) => handleSessionSettingUpdate(activeSessionId, { model_name: val })}
                         >
-                          <SelectTrigger className="w-full h-12 rounded-2xl border-border bg-muted/20 focus:ring-2 focus:ring-primary/20 hover:bg-muted/30 transition-all text-sm font-medium">
+                          <SelectTrigger className="w-full h-10 rounded-md border-border bg-muted/20 focus:ring-2 focus:ring-primary/20 hover:bg-muted/30 transition-all text-sm font-medium">
                             <SelectValue placeholder="Select Model" />
                           </SelectTrigger>
                           <SelectContent className="rounded-2xl shadow-2xl border-border">
@@ -451,26 +475,26 @@ function ChatPage() {
                           value={currentLanguage}
                           onValueChange={(val) => handleSessionSettingUpdate(activeSessionId, { language: val })}
                         >
-                          <SelectTrigger className="w-full h-12 rounded-2xl border-border bg-muted/20 focus:ring-2 focus:ring-primary/20 hover:bg-muted/30 transition-all text-sm font-medium">
+                          <SelectTrigger className="w-full h-10 rounded-md border-border bg-muted/20 focus:ring-0 hover:bg-muted/30 transition-all text-sm font-medium">
                             <SelectValue placeholder="Select Language" />
                           </SelectTrigger>
-                          <SelectContent className="rounded-2xl shadow-2xl border-border">
-                            <SelectItem value="English" className="rounded-xl">English (Default)</SelectItem>
-                            <SelectItem value="Spanish" className="rounded-xl">Español (Spanish)</SelectItem>
-                            <SelectItem value="French" className="rounded-xl">Français (French)</SelectItem>
-                            <SelectItem value="German" className="rounded-xl">Deutsch (German)</SelectItem>
-                            <SelectItem value="Chinese" className="rounded-xl">中文 (Chinese)</SelectItem>
-                            <SelectItem value="Japanese" className="rounded-xl">日本語 (Japanese)</SelectItem>
+                          <SelectContent className="rounded-md px-2 py-2 border-border">
+                            <SelectItem value="English" className="rounded-md">English (Default)</SelectItem>
+                            <SelectItem value="Spanish" className="rounded-md">Español (Spanish)</SelectItem>
+                            <SelectItem value="French" className="rounded-md">Français (French)</SelectItem>
+                            <SelectItem value="German" className="rounded-md">Deutsch (German)</SelectItem>
+                            <SelectItem value="Chinese" className="rounded-md">中文 (Chinese)</SelectItem>
+                            <SelectItem value="Japanese" className="rounded-md">日本語 (Japanese)</SelectItem>
                             <SelectItem value="Hindi" className="rounded-xl">हिन्दी (Hindi)</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
                     </div>
 
-                    <DialogFooter className="mt-8 border-t border-border/10 pt-6">
+                    <DialogFooter className="mt-8 border-t border-border/10 pt-4">
                       <Button
                         onClick={() => setIsSettingsOpen(false)}
-                        className="w-full h-12 rounded-2xl font-black uppercase tracking-widest text-xs"
+                        className="w-full h-10 rounded-md font-black capitalize cursor-pointer tracking-widest text-xs"
                       >
                         Acknowledge & Save
                       </Button>
@@ -490,7 +514,7 @@ function ChatPage() {
 
           {/* Messages */}
           <div className="flex-1 overflow-y-auto p-6 md:p-12 custom-scrollbar bg-linear-to-b from-background to-muted/10">
-            <div className="max-w-3xl mx-auto flex flex-col gap-6">
+            <div className="max-w-5xl mx-auto flex flex-col gap-6">
 
               {!activeSessionId ? (
                 <div className="flex-1 flex flex-col items-center justify-center mt-32 text-center animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -534,31 +558,33 @@ function ChatPage() {
 
           {/* Input Area */}
           {activeSessionId && (
-            <div className="border-t border-border bg-background p-6">
-              <div className="max-w-3xl mx-auto relative group">
-                <Input
-                  className="pr-16 pl-6 py-8 bg-muted/40 border-border/40 focus-visible:ring-primary/40 shadow-xl rounded-2xl text-base placeholder:text-muted-foreground/40 transition-all duration-300 hover:bg-muted/60 focus:bg-background"
-                  placeholder={selectedIds.length > 0 ? `Query against ${selectedIds.length} source(s)...` : "Start a general AI inquiry..."}
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      handleSend();
-                    }
-                  }}
-                  disabled={isAsking}
-                />
+            <div className=" ">
+              <div className="flex px-12 py-3 gap-2 justify-center items-center w-full">
+                <div className=" w-5/6 group">
+                  <Input
+                    className=" py-6 bg-muted/40 focus:ring-none  rounded-full pl-10 text-base placeholder:text-muted-foreground/40"
+                    placeholder={selectedIds.length > 0 ? `Query against ${selectedIds.length} source(s)...` : "Start a general AI inquiry..."}
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSend();
+                      }
+                    }}
+                    disabled={isAsking}
+                  />
+                </div>
                 <Button
                   size="icon"
-                  className="absolute right-3 top-1/2 -translate-y-1/2 h-12 w-12 shrink-0 bg-primary hover:bg-primary/90 transition-all duration-200 active:scale-90 disabled:opacity-50 rounded-xl shadow-lg shadow-primary/20"
+                  className="h-12 w-12 shrink-0 bg-primary hover:bg-primary/90 transition-all duration-200 active:scale-90 disabled:opacity-50 rounded-full cursor-pointer"
                   onClick={handleSend}
                   disabled={isAsking || !input.trim()}
                 >
                   <Send size={20} />
                 </Button>
               </div>
-              <div className="text-center mt-5 flex items-center justify-center gap-2">
+              <div className="text-center my-2 flex items-center justify-center gap-2">
                 <span className="text-[10px] font-bold text-muted-foreground/50 uppercase tracking-[0.2em]">
                   Encrypted Research Environment
                 </span>
@@ -575,14 +601,11 @@ function ChatPage() {
 
       {/* PDF Viewer Sheet */}
       <Sheet open={!!viewingDoc} onOpenChange={(open) => !open && setViewingDoc(null)}>
-        <SheetContent side="right" className="w-[85%] sm:max-w-4xl p-0 overflow-hidden flex flex-col bg-background/95 backdrop-blur-xl border-l border-border/50">
+        <SheetContent side="right" className="m:max-w-4xl p-0 overflow-hidden flex flex-col bg-background/95 backdrop-blur-xl border-l border-border/50">
           {viewingDoc && (
             <>
               <SheetHeader className="p-6 border-b border-border bg-background/50 backdrop-blur-md">
                 <SheetTitle className="flex items-center gap-3 text-lg font-bold truncate pr-8">
-                  <div className="p-2 bg-primary text-primary-foreground rounded-lg shadow-sm">
-                    <Eye size={20} />
-                  </div>
                   <div className="flex flex-col truncate">
                     <span className="truncate">{viewingDoc.filename}</span>
                     <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest mt-0.5">Page {viewingPage} active preview</span>

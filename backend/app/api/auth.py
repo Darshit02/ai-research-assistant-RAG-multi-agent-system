@@ -59,6 +59,7 @@ def get_current_user_profile(current_user: User = Depends(get_current_user)):
     return {
         "email": current_user.email,
         "id": current_user.id,
+        "role": current_user.role,
         "preferred_model": current_user.preferred_model,
         "gemini_api_key": "***" if current_user.gemini_api_key else None,
         "openai_api_key": "***" if current_user.openai_api_key else None,

@@ -1,9 +1,11 @@
-import { LucideIcon } from "lucide-react";
+import { LucideIcon, LucideProps } from "lucide-react";
+import { ComponentType } from "react";
+
 
 interface AnalyticsCardProps {
   title: string;
   value: string | number;
-  icon: LucideIcon;
+  icon: LucideIcon | ComponentType<LucideProps>;
   description?: string;
   trend?: {
     value: number;

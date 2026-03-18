@@ -9,7 +9,7 @@ import { StatusBadge } from "@/shared/components/StatusBadge";
 import { documentsApi, Analytics } from "@/shared/api/documents";
 import { setDocuments, removeDocument, setUploading } from "@/features/documents/documentsSlice";
 import { RootState } from "@/app/provider/store";
-import { FileText, MessageSquare, ListTodo, Trash2, Calendar } from "lucide-react";
+import { FileText, MessageSquare, ListTodo, Trash2, Calendar, LucideProps, CircleFadingPlus } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 
@@ -76,7 +76,8 @@ export default function DashboardPage() {
                 Overview of your research and interactions.
               </p>
             </div>
-            <a href="/pages/chat" className="inline-flex h-10 items-center justify-center rounded-md bg-primary px-6 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90">
+            <a href="/pages/chat" className="inline-flex gap-2 h-10 items-center justify-center rounded-md border-1 border-dashed border-primary px-6 text-sm font-medium text-primary">
+            <CircleFadingPlus className="" size={20}/>
               Start Chat
             </a>
           </div>
@@ -92,7 +93,53 @@ export default function DashboardPage() {
               <AnalyticsCard
                 title="Chat Sessions"
                 value={analytics.chat_sessions}
-                icon={MessageSquare}
+                icon={(props: LucideProps) => 
+                  <svg
+                    width="24"
+                    height="24"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                    {...props}
+                  >
+                    <path
+                      d="M17.98 10.79V14.79C17.98 15.05 17.97 15.3 17.94 15.54C17.71 18.24 16.12 19.58 13.19 19.58H12.79C12.54 19.58 12.3 19.7 12.15 19.9L10.95 21.5C10.42 22.21 9.56 22.21 9.03 21.5L7.82999 19.9C7.69999 19.73 7.41 19.58 7.19 19.58H6.79001C3.60001 19.58 2 18.79 2 14.79V10.79C2 7.86001 3.35001 6.27001 6.04001 6.04001C6.28001 6.01001 6.53001 6 6.79001 6H13.19C16.38 6 17.98 7.60001 17.98 10.79Z"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeMiterlimit="10"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <path
+                      d="M21.98 6.79001V10.79C21.98 13.73 20.63 15.31 17.94 15.54C17.97 15.3 17.98 15.05 17.98 14.79V10.79C17.98 7.60001 16.38 6 13.19 6H6.79004C6.53004 6 6.28004 6.01001 6.04004 6.04001C6.27004 3.35001 7.86004 2 10.79 2H17.19C20.38 2 21.98 3.60001 21.98 6.79001Z"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeMiterlimit="10"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <path
+                      d="M13.4955 13.25H13.5045"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <path
+                      d="M9.9955 13.25H10.0045"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <path
+                      d="M6.4955 13.25H6.5045"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>}
                 description="Active conversations"
               />
               <AnalyticsCard
@@ -120,9 +167,9 @@ export default function DashboardPage() {
               </h2>
 
               {loading ? (
-                 <div className="space-y-4">
-                   {[1, 2, 3].map(i => <div key={i} className="h-16 bg-secondary/30 rounded-lg animate-pulse" />)}
-                 </div>
+                <div className="space-y-4">
+                  {[1, 2, 3].map(i => <div key={i} className="h-16 bg-secondary/30 rounded-lg animate-pulse" />)}
+                </div>
               ) : documents.length === 0 ? (
                 <div className="text-center py-12 border border-dashed rounded-xl border-border bg-secondary/10">
                   <p className="text-muted-foreground">No documents uploaded yet.</p>
@@ -134,7 +181,7 @@ export default function DashboardPage() {
                       <tr>
                         <th className="px-6 py-4 font-medium">Filename</th>
                         <th className="px-6 py-4 font-medium">Status</th>
-                        <th className="px-6 py-4 font-medium"><div className="flex items-center gap-1"><Calendar size={14}/> Uploaded</div></th>
+                        <th className="px-6 py-4 font-medium"><div className="flex items-center gap-1"><Calendar size={14} /> Uploaded</div></th>
                         <th className="px-6 py-4 font-medium text-right">Actions</th>
                       </tr>
                     </thead>
