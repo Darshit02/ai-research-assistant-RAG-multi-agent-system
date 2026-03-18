@@ -28,7 +28,7 @@ def check_vector_store():
 
 def check_llm():
     try:
-        model = genai.GenerativeModel("models/gemini-2.5-flash")
+        model = genai.GenerativeModel("gemini-2.5-flash")
         response = model.generate_content("hello")
 
         if response:

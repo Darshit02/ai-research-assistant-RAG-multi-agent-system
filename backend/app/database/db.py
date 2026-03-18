@@ -50,8 +50,11 @@ def ensure_user_columns():
     """Add missing columns to users table if they were added to the model later."""
     with engine.connect() as conn:
         for column_sql in [
-            "ALTER TABLE users ADD COLUMN preferred_model VARCHAR DEFAULT 'gemini-2.5-flash'",
+            "ALTER TABLE users ADD COLUMN preferred_model VARCHAR DEFAULT 'gemini-1.5-flash'",
             "ALTER TABLE users ADD COLUMN api_key VARCHAR",
+            "ALTER TABLE users ADD COLUMN gemini_api_key VARCHAR",
+            "ALTER TABLE users ADD COLUMN openai_api_key VARCHAR",
+            "ALTER TABLE users ADD COLUMN anthropic_api_key VARCHAR",
         ]:
             try:
                 conn.execute(text(column_sql))
@@ -68,6 +71,21 @@ def ensure_document_columns():
             "ALTER TABLE documents ADD COLUMN status VARCHAR DEFAULT 'processing'",
             "ALTER TABLE documents ADD COLUMN uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP",
             "ALTER TABLE documents ADD COLUMN expires_at DATETIME",
+        ]:
+            try:
+                conn.execute(text(column_sql))
+                conn.commit()
+            except Exception:
+                conn.rollback()
+                pass
+
+def ensure_session_columns():
+    with engine.connect() as conn:
+        for column_sql in [
+            "ALTER TABLE chat_sessions ADD COLUMN title VARCHAR DEFAULT 'New Chat'",
+            "ALTER TABLE chat_sessions ADD COLUMN language VARCHAR DEFAULT 'English'",
+            "ALTER TABLE chat_sessions ADD COLUMN model_name VARCHAR",
+            "ALTER TABLE chat_messages ADD COLUMN citations TEXT",
         ]:
             try:
                 conn.execute(text(column_sql))

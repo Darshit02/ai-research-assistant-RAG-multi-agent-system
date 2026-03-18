@@ -1,4 +1,4 @@
-from fastapi import APIRouter, BackgroundTasks, Depends, File, Request, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Request, UploadFile, Query
 from fastapi.exceptions import HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
@@ -188,19 +188,20 @@ def highlight_text(
 @router.put("/settings")
 def update_settings(
     model: str,
-    api_key: str,
+    api_key: str = "",
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     current_user.preferred_model = model
-    current_user.api_key = api_key
+    
+    if api_key.strip() == "":
+        current_user.api_key = None
+    else:
+        current_user.api_key = api_key
 
     db.commit()
 
     return {"message": "Settings updated"}
-
-
-# ────────────────────────────── SESSIONS ──────────────────────────────
 
 @router.post("/sessions")
 def create_session(
@@ -218,7 +219,9 @@ def create_session(
 
     return {
         "session_id": session.id,
-        "language": session.language
+        "language": session.language,
+        "model_name": session.model_name,
+        "title": session.title
     }
 
 
@@ -234,11 +237,37 @@ def chat_stats(
     return [
         {
             "session_id": s.id,
-            "created_at": s.created_at
+            "created_at": s.created_at,
+            "title": s.title,
+            "language": s.language,
+            "model_name": s.model_name
         }
         for s in sessions
     ]
 
+
+@router.put("/sessions/{session_id}/settings")
+def update_session_settings(
+    session_id: str,
+    settings: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    session = db.query(ChatSession).filter(
+        ChatSession.id == session_id,
+        ChatSession.user_id == current_user.id
+    ).first()
+
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    if "language" in settings:
+        session.language = settings["language"]
+    if "model_name" in settings:
+        session.model_name = settings["model_name"]
+
+    db.commit()
+    return {"message": "Session settings updated"}
 
 @router.put("/sessions/{session_id}/language")
 def change_language(
@@ -261,6 +290,48 @@ def change_language(
 
     return {"message": "Language updated"}
 
+@router.put("/sessions/{session_id}/title")
+def update_title(
+    session_id: str,
+    title: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    session = db.query(ChatSession).filter(
+        ChatSession.id == session_id,
+        ChatSession.user_id == current_user.id
+    ).first()
+
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    session.title = title
+
+    db.commit()
+
+    return {"message": "Title updated"}
+
+
+def auto_generate_title(session_id: str, question: str, user_id: str, db: Session):
+    try:
+        import google.generativeai as genai
+        user = db.query(User).filter(User.id == user_id).first()
+        api_key = user.api_key or os.getenv("GEMINI_API_KEY")
+        if not api_key: return
+        
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel("gemini-1.5-flash")
+        prompt = f"Analyze this user question and generate a very short, concise title (max 5 words) for a chat session. Question: {question}. Only return the title text, nothing else."
+        
+        response = model.generate_content(prompt)
+        title = response.text.strip().replace('"', '').replace("'", "")
+        
+        session = db.query(ChatSession).filter(ChatSession.id == session_id).first()
+        if session:
+            session.title = title
+            db.commit()
+    except Exception as e:
+        print(f"Error auto-generating title: {e}")
 
 @router.delete("/sessions/{session_id}")
 def delete_session(
@@ -289,13 +360,15 @@ def get_messages(
 ):
     messages = db.query(ChatMessage).filter(
         ChatMessage.session_id == session_id
-    ).all()
+    ).order_by(ChatMessage.created_at).all()
 
+    import json
     return [
         {
             "role": m.role,
             "content": m.content,
-            "created_at": m.created_at
+            "created_at": m.created_at,
+            "citations": json.loads(m.citations) if m.citations else []
         }
         for m in messages
     ]
@@ -306,7 +379,8 @@ def ask_question(
     request: Request,
     question: str,
     session_id: str,
-    document_ids: list[str] = [],
+    background_tasks: BackgroundTasks,
+    document_ids: list[str] = Query(default=[]),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -317,6 +391,9 @@ def ask_question(
         db,
         document_ids,
     )
+    session = db.query(ChatSession).filter(ChatSession.id == session_id).first()
+    if session and (session.title == "New Chat" or not session.title):
+        background_tasks.add_task(auto_generate_title, session_id, question, current_user.id, db)
 
     return result
 
@@ -330,9 +407,6 @@ def ask_stream(
     generator = stream_answer(question, current_user.id, db)
 
     return StreamingResponse(generator, media_type="text/plain")
-
-
-# ────────────────────────────── DOCUMENT DETAIL / DELETE (wildcard LAST) ──
 
 @router.get("/{document_id}")
 def get_document(

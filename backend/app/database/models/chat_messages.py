@@ -12,8 +12,8 @@ class ChatMessage(Base):
 
     session_id = Column(String(36), ForeignKey("chat_sessions.id"), index=True)
 
-    role = Column(String)  # user / assistant
-
+    role = Column(String)
     content = Column(Text)
+    citations = Column(Text, nullable=True)
 
     created_at = Column(DateTime, default=datetime.utcnow)

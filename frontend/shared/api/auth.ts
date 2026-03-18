@@ -11,5 +11,20 @@ export const authApi = {
     }),
 
   getMe: () =>
-    api.get<{ id: string; email: string; created_at: string; role: string }>("/auth/user/me"),
+    api.get<{ 
+      id: string; 
+      email: string; 
+      preferred_model?: string;
+      gemini_api_key?: string;
+      openai_api_key?: string;
+      anthropic_api_key?: string;
+    }>("/auth/user/me"),
+
+  updateSettings: (settings: { 
+    preferred_model?: string; 
+    api_key?: string;
+    gemini_api_key?: string;
+    openai_api_key?: string;
+    anthropic_api_key?: string;
+  }) => api.put("/auth/user/settings", settings),
 };

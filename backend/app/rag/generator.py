@@ -1,17 +1,20 @@
 import json
 import os
+from collections import defaultdict
 
 import google.generativeai as genai
-from collections import defaultdict
+from openai import OpenAI
+from anthropic import Anthropic
+from google.api_core import exceptions
 
 from app.database.models.chat import ChatHistory
 from app.database.models.chat_messages import ChatMessage
 from app.database.models.document import Document
 from app.database.models.model import User
 from app.database.models.usage import Usage
+from app.database.models.chat_session import ChatSession
 
 from app.rag.retrieval import retrieve_context
-
 from app.services.embedding_service import create_embeddings
 from app.services.similarity import cosine_similarity
 from app.services.retrieval_memory import get_cached_chunks, store_retrieval_memory
@@ -19,274 +22,178 @@ from app.services.response_parser import parse_structured_answer
 from app.services.query_planner import plan_queries
 from app.services.token_counter import estimate_tokens
 from app.services.query_translation import translate_query
-from app.database.models.chat_session import ChatSession
+from app.services.query_analyzer import analyze_query
 
-DEFAULT_MODEL = "models/gemini-2.5-pro"
+DEFAULT_MODEL = "gemini-2.5-flash"
 
+def _get_api_key(user, provider: str):
+    if provider == "google":
+        return user.gemini_api_key or user.api_key or os.getenv("GEMINI_API_KEY")
+    return None
 
-def _get_model(db, user_id: str):
-    """Configure genai and return a GenerativeModel for the given user (API key + preferred model)."""
+def _get_provider(model_name: str):
+    return "google"
+
+def get_model(db, user_id):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        return None
+    
+    preferred_model = user.preferred_model or DEFAULT_MODEL
+    provider = _get_provider(preferred_model)
+    api_key = _get_api_key(user, provider)
+    
+    if not api_key:
+        return None
+
+    if provider == "google":
+        genai.configure(api_key=api_key)
+        return genai.GenerativeModel(preferred_model)
+    elif provider == "openai":
+        return OpenAI(api_key=api_key)
+    elif provider == "anthropic":
+        return Anthropic(api_key=api_key)
+    return None
+_get_model = get_model
+
+def generate_answer(question: str, user_id: str, session_id: str, db, document_ids: list[str]):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise ValueError("User not found")
-    api_key = user.api_key or os.getenv("GEMINI_API_KEY")
-    genai.configure(api_key=api_key)
-    return genai.GenerativeModel(user.preferred_model or DEFAULT_MODEL)
+    session = db.query(ChatSession).filter(ChatSession.id == session_id).first()
+    
+    preferred_model = (session.model_name if session and session.model_name else user.preferred_model) or DEFAULT_MODEL
+    language = (session.language if session and session.language else "English")
+    
+    provider = _get_provider(preferred_model)
+    api_key = _get_api_key(user, provider)
 
+    if not api_key:
+        return {"error": f"API Key for {provider} not found. Please check your settings."}
 
-def generate_answer(question: str, user_id: str, session_id: str, db, document_ids: list[str]):
     question_embedding = create_embeddings([question])[0]
-    history_cache = db.query(ChatHistory).filter(
-        ChatHistory.user_id == user_id
-    ).all()
-    session = db.query(ChatSession).filter(
-        ChatSession.id == session_id
-    ).first()
-    language = session.language
+    history_cache = db.query(ChatHistory).filter(ChatHistory.user_id == user_id).all()
     for record in history_cache:
         old_embedding = json.loads(record.embedding)
-        similarity = cosine_similarity(
-            question_embedding,
-            old_embedding
-        )
-        if similarity > 0.90:
-            print("Returning cached answer")
+        if cosine_similarity(question_embedding, old_embedding) > 0.95:
+            return {"answer": record.answer, "citations": [], "cached": True}
 
-            return {
-                "answer": record.answer,
-                "citations": []
-            }
+    session = db.query(ChatSession).filter(ChatSession.id == session_id).first()
+    language = session.language or "English"
+
     messages = (
         db.query(ChatMessage)
         .filter(ChatMessage.session_id == session_id)
         .order_by(ChatMessage.created_at)
         .all()
     )
-
     history = "\n".join(f"{m.role}: {m.content}" for m in messages)
-    docs = db.query(Document).filter(
-        Document.user_id == user_id
-    ).all()
-
-    if not docs:
-        return {
-            "summary": "",
-            "key_findings": "",
-            "evidence": "",
-            "comparison": "",
-            "conclusion": "",
-            "citations": [],
-            "message": (
-                "I could not find any uploaded documents for your account, "
-                "so I wasn't able to answer this question. "
-                "Please upload one or more PDFs and try again."
-            ),
-        }
-
-    model = _get_model(db, user_id)
-    cached_chunks = get_cached_chunks(
-        session_id,
-        question_embedding,
-        db
-    )
-
-    if cached_chunks:
-        context_chunks = cached_chunks
-    else:
-        english_question = translate_query(question, model)
-
-        sub_questions_original = plan_queries(question, model)
-        sub_questions_english = plan_queries(english_question, model)
-
+    context_chunks = get_cached_chunks(session_id, question_embedding, db)
+    if not context_chunks:
+        model_instance = genai.GenerativeModel(preferred_model)
+        english_question, sub_queries = analyze_query(question, model_instance)
+        
         all_chunks = []
-
-        for q in sub_questions_original:
-            chunks = retrieve_context(q, document_ids)
-            all_chunks.extend(chunks)
-
-        for q in sub_questions_english:
-            chunks = retrieve_context(q, document_ids)
-            all_chunks.extend(chunks)
-
+        for q in set(sub_queries):
+            all_chunks.extend(retrieve_context(q, document_ids))
+        
         if not all_chunks:
-            return {
-                "summary": "",
-                "key_findings": "",
-                "evidence": "",
-                "comparison": "",
-                "conclusion": "",
-                "citations": [],
-                "message": (
-                    "I could not find any relevant content in your documents "
-                    "to answer this question. "
-                    "Try rephrasing your question or uploading more detailed documents."
-                ),
-            }
+            return {"message": "No relevant context found.", "citations": []}
 
         seen = set()
         context_chunks = []
-
         for c in all_chunks:
             key = (c["text"], c["page"], c["document_id"])
             if key not in seen:
                 seen.add(key)
                 context_chunks.append(c)
-        store_retrieval_memory(
-            session_id,
-            question_embedding,
-            context_chunks,
-            db
-        )
-    grouped_chunks = defaultdict(list)
-    for chunk in context_chunks:
-        grouped_chunks[chunk["document_id"]].append(chunk)
-    document_analyses = []
-    for doc_id, chunks in grouped_chunks.items():
-        doc_context = "\n\n".join(
-            f"{c['text']} [Page {c['page']}]"
-            for c in chunks
-        )
-        doc_prompt = f"""
-You are analyzing a research document.
+        store_retrieval_memory(session_id, question_embedding, context_chunks, db)
 
-Document Context:
-{doc_context}
-
-Question:
-{question}
-
-Explain how this document answers the question.
-"""
-
-        doc_response = model.generate_content(doc_prompt)
-        summary = doc_response.candidates[0].content.parts[0].text
-        document_analyses.append(summary)
-    combined_analysis = "\n\n".join(document_analyses)
-
-    final_prompt = f"""
-You are an AI research assistant.
-
-Conversation history:
-{history}
-
-Multiple documents were analyzed.
-
-Document analyses:
-{combined_analysis}
-
-User question:
-{question}
-
-Return the response in the following structured format:
-
-Summary:
-<short overview>
-
-Key Findings:
-- finding 1
-- finding 2
-
-Evidence:
-- important supporting facts from documents
-
-Comparison:
-<compare documents if relevant>
-
-Conclusion:
-<final insight>
-"""
-
-    response = model.generate_content(final_prompt)
-
-    answer = response.candidates[0].content.parts[0].text
-    tokens_used = estimate_tokens(question + answer)
-    usage = Usage(
-        user_id=user_id,
-        model="gemini-2.5-flash",
-        tokens=tokens_used
-    )
-
-    db.add(usage)
-    db.commit()
-    structured = parse_structured_answer(answer)
-    top_evidence = context_chunks[:3]
-
-    citations = [
-        {
-            "document_id": c["document_id"],
-            "page": c["page"],
-            "text": c["text"]
-        }
-        for c in top_evidence
-    ]
-
-    db.add(
-        ChatMessage(
-            session_id=session_id,
-            role="user",
-            content=question
-        )
-    )
-
-    db.add(
-        ChatMessage(
-            session_id=session_id,
-            role="assistant",
-            content=answer
-        )
-    )
-    cache = ChatHistory(
-        user_id=user_id,
-        question=question,
-        answer=answer,
-        embedding=json.dumps(question_embedding.tolist())
-    )
-
-    db.add(cache)
-
-    db.commit()
-
-    return {
-        "summary": structured["summary"].strip(),
-        "key_findings": structured["key_findings"].strip(),
-        "evidence": structured["evidence"].strip(),
-        "comparison": structured["comparison"].strip(),
-        "conclusion": structured["conclusion"].strip(),
-        "citations": citations
-    }
-
-
-def stream_answer(question: str, user_id: str, db):
-
-    docs = db.query(Document).filter(Document.user_id == user_id).all()
-    document_ids = [doc.id for doc in docs]
-
-    context_chunks = retrieve_context(question, document_ids)
-
-    context = "\n\n".join(
-        [
-            f"Document: {c['document_name']} (Page {c['page']})\n{c['text']}"
-            for c in context_chunks
-        ]
-    )
+    context_text = "\n\n".join([f"[Doc: {c['document_id']}, Page: {c['page']}] {c['text']}" for c in context_chunks])
 
     prompt = f"""
-You are an AI research assistant.
+    You are an AI research assistant. Your goal is to answer the user question accurately based ONLY on the provided context.
+    
+    Context:
+    {context_text}
+    
+    Question:
+    {question}
+    
+    Instructions:
+    1. Respond in {language}.
+    2. Use the following structured format:
+       Summary: <brief overview>
+       Key Findings: - <point 1>
+       Evidence: - <fact with [Page X] citation>
+       Conclusion: <final insight>
+    3. You MUST include page numbers like [Page X] in your answer when referencing facts.
+    4. If the context doesn't contain the answer, state that you don't know based on the provided documents.
+    """
 
-Context:
-{context}
+    answer = ""
+    try:
+        if provider == "openai":
+            client = OpenAI(api_key=api_key)
+            response = client.chat.completions.create(
+                model=preferred_model,
+                messages=[{"role": "user", "content": prompt}]
+            )
+            answer = response.choices[0].message.content
+        elif provider == "anthropic":
+            client = Anthropic(api_key=api_key)
+            response = client.messages.create(
+                model=preferred_model,
+                max_tokens=2000,
+                messages=[{"role": "user", "content": prompt}]
+            )
+            answer = response.content[0].text
+        else:
+            genai.configure(api_key=api_key)
+            gemini_model = genai.GenerativeModel(preferred_model)
+            response = gemini_model.generate_content(prompt)
+            answer = response.text
+    except exceptions.ResourceExhausted:
+        error_message = "API key reached limit. Please check your plan or try again later."
+        db.add(ChatMessage(session_id=session_id, role="user", content=question))
+        db.add(ChatMessage(
+            session_id=session_id, 
+            role="error", 
+            content=error_message
+        ))
+        db.commit()
+        return {"error": error_message, "role": "error"}
+    except Exception as e:
+        return {"error": f"Model error ({provider}): {str(e)}"}
+    
+    structured = parse_structured_answer(answer)
+    citations = [{"document_id": c["document_id"], "page": c["page"], "text": c["text"]} for c in context_chunks[:5]]
+    db.add(ChatMessage(session_id=session_id, role="user", content=question))
+    db.add(ChatMessage(
+        session_id=session_id, 
+        role="assistant", 
+        content=answer,
+        citations=json.dumps(citations)
+    ))
+    db.add(ChatHistory(user_id=user_id, question=question, answer=answer, embedding=json.dumps(question_embedding.tolist())))
+    db.commit()
 
-Question:
-{question}
+    return {**structured, "citations": citations}
 
-Answer clearly.
-"""
-    model = _get_model(db, user_id)
-    response = model.generate_content(
-        prompt,
-        stream=True
-    )
-
-    for chunk in response:
-        if chunk.text:
+def stream_answer(question: str, user_id: str, db):
+    user = db.query(User).filter(User.id == user_id).first()
+    preferred_model = user.preferred_model or DEFAULT_MODEL
+    provider = _get_provider(preferred_model)
+    api_key = _get_api_key(user, provider)
+    
+    if provider == "google":
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel(preferred_model)
+        response = model.generate_content(question, stream=True)
+        for chunk in response:
             yield chunk.text
+    else:
+        yield "Streaming not yet fully implemented for OpenAI/Anthropic. Using standard response instead."
+        res = generate_answer(question, user_id, "active_session", db, [])
+        yield res.get("answer", str(res))
+

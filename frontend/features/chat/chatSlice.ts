@@ -37,6 +37,29 @@ const chatSlice = createSlice({
     setActiveSession: (state, action: PayloadAction<string>) => {
       state.activeSessionId = action.payload;
     },
+    updateSessionTitle: (
+      state,
+      action: PayloadAction<{ sessionId: string; title: string }>
+    ) => {
+      const session = state.sessions.find(
+        (s) => s.session_id === action.payload.sessionId
+      );
+      if (session) {
+        session.title = action.payload.title;
+      }
+    },
+    updateSessionSettings: (
+      state,
+      action: PayloadAction<{ sessionId: string; language?: string; model_name?: string }>
+    ) => {
+      const session = state.sessions.find(
+        (s) => s.session_id === action.payload.sessionId
+      );
+      if (session) {
+        if (action.payload.language) session.language = action.payload.language;
+        if (action.payload.model_name) session.model_name = action.payload.model_name;
+      }
+    },
     setMessages: (
       state,
       action: PayloadAction<{ sessionId: string; messages: ChatMessage[] }>
@@ -62,6 +85,8 @@ export const {
   addSession,
   removeSession,
   setActiveSession,
+  updateSessionTitle,
+  updateSessionSettings,
   setMessages,
   appendMessage,
   setLoading,

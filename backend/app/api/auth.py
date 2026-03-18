@@ -62,5 +62,35 @@ def login_json(credentials: UserLogin, db: Session = Depends(get_db)):
 def get_current_user_profile(current_user: User = Depends(get_current_user)):
     return {
         "email": current_user.email,
-        "id": current_user.id
+        "id": current_user.id,
+        "preferred_model": current_user.preferred_model,
+        "gemini_api_key": "***" if current_user.gemini_api_key else None,
+        "openai_api_key": "***" if current_user.openai_api_key else None,
+        "anthropic_api_key": "***" if current_user.anthropic_api_key else None
+    }
+
+@router.put("/user/settings")
+def update_user_settings(
+    settings: dict, 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    if "preferred_model" in settings:
+        current_user.preferred_model = settings["preferred_model"]
+    if "api_key" in settings:
+        current_user.api_key = settings["api_key"]
+    if "gemini_api_key" in settings:
+        current_user.gemini_api_key = settings["gemini_api_key"]
+    if "openai_api_key" in settings:
+        current_user.openai_api_key = settings["openai_api_key"]
+    if "anthropic_api_key" in settings:
+        current_user.anthropic_api_key = settings["anthropic_api_key"]
+    
+    db.commit()
+    return {
+        "message": "Settings updated", 
+        "preferred_model": current_user.preferred_model,
+        "gemini_api_key": "***" if current_user.gemini_api_key else None,
+        "openai_api_key": "***" if current_user.openai_api_key else None,
+        "anthropic_api_key": "***" if current_user.anthropic_api_key else None
     }

@@ -5,26 +5,69 @@ import { usePathname } from "next/navigation";
 import { useDispatch, useSelector } from "react-redux";
 import { RootState } from "@/app/provider/store";
 import { logout } from "@/features/auth/authSlice";
+import { useEffect, useState } from "react";
 import {
   LayoutDashboard,
   MessageSquare,
-  FileText,
   Settings,
   ShieldAlert,
   LogOut,
   Bot,
+  Cpu,
+  Key,
+  Loader2
 } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/shared/components/ui/dialog";
+import { Input } from "@/shared/components/ui/input";
+import { Label } from "@/shared/components/ui/label";
+import { Button } from "@/shared/components/ui/button";
+import { documentsApi } from "@/shared/api/documents";
+import { authApi } from "@/shared/api/auth";
+import { toast } from "sonner";
 
 export function AppSidebar() {
   const pathname = usePathname();
   const dispatch = useDispatch();
   const user = useSelector((state: RootState) => state.auth.user);
+  
+  const [model, setModel] = useState("gemini-1.5-flash");
+  const [geminiKey, setGeminiKey] = useState("");
+  const [openaiKey, setOpenaiKey] = useState("");
+  const [anthropicKey, setAnthropicKey] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [openSettings, setOpenSettings] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      if (user.preferred_model) setModel(user.preferred_model);
+      if (user.gemini_api_key && user.gemini_api_key !== "***") setGeminiKey(user.gemini_api_key);
+      if (user.openai_api_key && user.openai_api_key !== "***") setOpenaiKey(user.openai_api_key);
+      if (user.anthropic_api_key && user.anthropic_api_key !== "***") setAnthropicKey(user.anthropic_api_key);
+    }
+  }, [user]);
+
+  const handleSaveSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      await authApi.updateSettings({
+        preferred_model: model,
+        gemini_api_key: geminiKey || undefined,
+        openai_api_key: openaiKey || undefined,
+        anthropic_api_key: anthropicKey || undefined,
+      });
+      toast.success("Settings updated successfully");
+      setOpenSettings(false);
+    } catch (error) {
+      toast.error("Failed to update settings");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const navItems = [
     { name: "Dashboard", href: "/pages/dashboard", icon: LayoutDashboard },
     { name: "Chat", href: "/pages/chat", icon: MessageSquare },
-    { name: "Documents", href: "/pages/documents", icon: FileText },
-    { name: "Settings", href: "/pages/settings", icon: Settings },
   ];
 
   if (user?.role === "admin") {
@@ -62,6 +105,80 @@ export function AppSidebar() {
             </Link>
           );
         })}
+
+        <Dialog open={openSettings} onOpenChange={setOpenSettings}>
+          <DialogTrigger asChild>
+            <button
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 text-muted-foreground hover:bg-muted hover:text-foreground"
+            >
+              <Settings size={18} />
+              Settings
+            </button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-[425px] rounded-[2rem] border-border shadow-2xl overflow-hidden glass-card">
+            <DialogHeader className="p-6 bg-muted/20 border-b border-border/50">
+              <DialogTitle className="flex items-center gap-3 text-xl font-bold">
+                <div className="p-2 bg-primary/10 text-primary rounded-xl">
+                  <Settings size={20} />
+                </div>
+                Platform Settings
+              </DialogTitle>
+              <DialogDescription className="text-xs">
+                Configure your global AI preferences and provider API keys.
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleSaveSettings} className="p-6 space-y-8 max-h-[70vh] overflow-y-auto custom-scrollbar">
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 ml-1">
+                  <Cpu size={14} className="text-primary" />
+                  <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Default Model Library</label>
+                </div>
+                <div className="space-y-2">
+                  <select
+                    id="model"
+                    value={model}
+                    onChange={(e) => setModel(e.target.value)}
+                    className="flex h-12 w-full rounded-2xl border border-border bg-muted/20 px-4 text-sm focus:ring-2 focus:ring-primary/20 appearance-none transition-all hover:bg-muted/30 outline-none"
+                  >
+                    <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+                    <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="space-y-6">
+                <div className="flex items-center gap-2 ml-1">
+                  <Key size={14} className="text-primary" />
+                  <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Gemini API Access</label>
+                </div>
+                
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="geminiKey" className="text-xs font-bold flex items-center gap-2">API Key</Label>
+                    <Input
+                      id="geminiKey"
+                      type="password"
+                      placeholder="Enter Gemini Key"
+                      value={geminiKey}
+                      onChange={(e) => setGeminiKey(e.target.value)}
+                      className="rounded-xl bg-muted/20 border-border/50 h-10"
+                    />
+                  </div>
+                </div>
+                
+                <p className="text-[10px] text-muted-foreground mt-1 leading-relaxed opacity-60 italic ml-1">
+                  Leave blank to use environment defaults.
+                </p>
+              </div>
+
+              <div className="pt-4">
+                <Button type="submit" disabled={loading} className="w-full h-12 rounded-2xl gap-2 font-black uppercase tracking-widest text-xs shadow-lg shadow-primary/20 transition-all hover:scale-[1.02] active:scale-[0.98]">
+                  {loading ? <Loader2 size={16} className="animate-spin" /> : "Save Changes"}
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
       </nav>
 
       <div className="p-4 mt-auto border-t border-border">

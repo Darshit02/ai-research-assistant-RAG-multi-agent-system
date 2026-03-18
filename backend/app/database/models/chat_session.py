@@ -11,6 +11,8 @@ class ChatSession(Base):
 
     id = Column(String(36), primary_key=True, index=True, default=lambda: str(uuid.uuid4()))
     user_id = Column(String(36), ForeignKey("users.id"), index=True)
+    title = Column(String, default="New Chat")
     language = Column(String, default="English")
+    model_name = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 

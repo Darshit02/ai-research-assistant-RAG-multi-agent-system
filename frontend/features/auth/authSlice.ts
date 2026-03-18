@@ -4,6 +4,10 @@ interface User {
   id: string;
   email: string;
   role?: string;
+  preferred_model?: string;
+  gemini_api_key?: string;
+  openai_api_key?: string;
+  anthropic_api_key?: string;
 }
 
 interface AuthState {

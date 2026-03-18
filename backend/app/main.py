@@ -1,4 +1,7 @@
 import asyncio
+from dotenv import load_dotenv
+load_dotenv()
+
 from fastapi import Depends, FastAPI
 from fastapi.staticfiles import StaticFiles
 from sentence_transformers import CrossEncoder
@@ -8,7 +11,7 @@ from starlette.responses import JSONResponse
 from app.api import auth, document_api
 from app.core.dependencies import get_current_user
 
-from app.database.db import engine, ensure_document_columns, ensure_user_columns, ensure_uuid_schema
+from app.database.db import engine, ensure_document_columns, ensure_user_columns, ensure_uuid_schema, ensure_session_columns
 from app.database.models.chat_messages import ChatMessage
 from app.database.models.chat_session import ChatSession
 from app.database.models.model import Base, User
@@ -37,6 +40,7 @@ ensure_uuid_schema()
 Base.metadata.create_all(bind=engine)
 ensure_user_columns()
 ensure_document_columns()
+ensure_session_columns()
 app.include_router(auth.router)
 app.include_router(system_api.router)
 app.include_router(admin_api.router)

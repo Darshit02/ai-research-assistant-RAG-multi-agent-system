@@ -10,9 +10,12 @@ class User(Base) :
     id = Column(String(36), primary_key=True, index=True, default=lambda: str(uuid.uuid4()))
     email = Column(String , unique=True , index=True)
     password_hash = Column(String)
-    preferred_model = Column(String, default="gemini-2.5-flash")
+    preferred_model = Column(String, default="gemini-1.5-flash")
     role = Column(String, default="user")
     api_key = Column(String, nullable=True)
+    gemini_api_key = Column(String, nullable=True)
+    openai_api_key = Column(String, nullable=True)
+    anthropic_api_key = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 class OTPCode(Base):
