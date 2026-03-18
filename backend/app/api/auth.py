@@ -14,7 +14,6 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 def _authenticate_and_token(email: str, password: str, db: Session):
-    """Shared logic: validate credentials and return token or raise HTTPException."""
     db_user = db.query(User).filter(User.email == email).first()
     if not db_user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
@@ -22,8 +21,6 @@ def _authenticate_and_token(email: str, password: str, db: Session):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     token = create_access_token({"sub": db_user.email})
     return {"access_token": token, "token_type": "bearer"}
-
-
 
 @router.post("/register")
 def register(user:UserRegister ,db:Session = Depends(get_db)):
@@ -35,7 +32,6 @@ def register(user:UserRegister ,db:Session = Depends(get_db)):
         email=user.email,
         password_hash=hash_password(user.password)
     )
-
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
@@ -94,3 +90,7 @@ def update_user_settings(
         "openai_api_key": "***" if current_user.openai_api_key else None,
         "anthropic_api_key": "***" if current_user.anthropic_api_key else None
     }
+
+@router.post("/logout")
+def logout():
+    return {"message": "Logged out successfully"}

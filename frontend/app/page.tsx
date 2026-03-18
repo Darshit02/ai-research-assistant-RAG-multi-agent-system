@@ -1,8 +1,14 @@
+"use client";
+
 import { Button } from "@/shared/components/ui/button";
 import Link from "next/link";
 import { ArrowRight, BrainCircuit, FileSearch, LineChart } from "lucide-react";
+import { useSelector } from "react-redux";
+import { RootState } from "./provider/store";
 
 export default function LandingPage() {
+  const { user } = useSelector((state: RootState) => state.auth);
+
   return (
     <div className="min-h-screen bg-background flex flex-col relative overflow-hidden">
       {/* Background Gradients */}
@@ -18,16 +24,26 @@ export default function LandingPage() {
             AI Assistant
           </div>
           <div className="flex gap-4">
-            <Link href="/pages/login">
-              <Button variant="ghost" className="font-medium text-muted-foreground hover:text-foreground">
-                Log in
-              </Button>
-            </Link>
-            <Link href="/pages/register">
-              <Button className="font-medium bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20">
-                Get Started
-              </Button>
-            </Link>
+            {user ? (
+              <Link href="/pages/dashboard">
+                <Button className="font-medium bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20">
+                  Go to Dashboard
+                </Button>
+              </Link>
+            ) : (
+              <>
+                <Link href="/pages/login">
+                  <Button variant="ghost" className="font-medium text-muted-foreground hover:text-foreground">
+                    Log in
+                  </Button>
+                </Link>
+                <Link href="/pages/register">
+                  <Button className="font-medium bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20">
+                    Get Started
+                  </Button>
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </nav>
@@ -53,9 +69,9 @@ export default function LandingPage() {
         </p>
 
         <div className="flex flex-col sm:flex-row gap-4 animate-[slide-up_1.2s_ease-out]">
-          <Link href="/pages/register">
+          <Link href={user ? "/pages/dashboard" : "/pages/register"}>
             <Button size="lg" className="h-14 px-8 text-base font-semibold shadow-xl shadow-primary/25 rounded-xl gap-2 w-full sm:w-auto">
-              Start Researching Free <ArrowRight size={18} />
+              {user ? "Continue Researching" : "Start Researching Free"} <ArrowRight size={18} />
             </Button>
           </Link>
         </div>

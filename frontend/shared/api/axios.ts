@@ -6,8 +6,6 @@ const api = axios.create({
 });
 
 api.interceptors.request.use((config) => {
-  // Read from localStorage so the token is available immediately after login,
-  // before it is dispatched to Redux.
   const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
 
   if (token) {

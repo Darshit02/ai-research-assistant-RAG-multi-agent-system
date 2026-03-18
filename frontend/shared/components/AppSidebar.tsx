@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useDispatch, useSelector } from "react-redux";
 import { RootState } from "@/app/provider/store";
 import { logout } from "@/features/auth/authSlice";
@@ -27,9 +27,10 @@ import { toast } from "sonner";
 
 export function AppSidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const dispatch = useDispatch();
   const user = useSelector((state: RootState) => state.auth.user);
-  
+
   const [model, setModel] = useState("gemini-1.5-flash");
   const [geminiKey, setGeminiKey] = useState("");
   const [openaiKey, setOpenaiKey] = useState("");
@@ -45,6 +46,19 @@ export function AppSidebar() {
       if (user.anthropic_api_key && user.anthropic_api_key !== "***") setAnthropicKey(user.anthropic_api_key);
     }
   }, [user]);
+
+  const handleLogout = async () => {
+    try {
+      await authApi.logout();
+      dispatch(logout());
+      toast.success("Successfully logged out");
+      router.push("/");
+    } catch (error) {
+      console.error("Logout failed", error);
+      dispatch(logout());
+      router.push("/");
+    }
+  };
 
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -66,8 +80,9 @@ export function AppSidebar() {
   };
 
   const navItems = [
-    { name: "Dashboard", href: "/pages/dashboard", icon: LayoutDashboard },
     { name: "Chat", href: "/pages/chat", icon: MessageSquare },
+    { name: "Dashboard", href: "/pages/dashboard", icon: LayoutDashboard },
+    
   ];
 
   if (user?.role === "admin") {
@@ -94,11 +109,10 @@ export function AppSidebar() {
             <Link
               key={item.href}
               href={item.href}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 ${
-                isActive
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 ${isActive
                   ? "bg-primary/10 text-primary font-medium"
                   : "text-muted-foreground hover:bg-muted hover:text-foreground"
-              }`}
+                }`}
             >
               <item.icon size={18} className={isActive ? "text-primary" : ""} />
               {item.name}
@@ -151,7 +165,7 @@ export function AppSidebar() {
                   <Key size={14} className="text-primary" />
                   <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Gemini API Access</label>
                 </div>
-                
+
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="geminiKey" className="text-xs font-bold flex items-center gap-2">API Key</Label>
@@ -165,7 +179,7 @@ export function AppSidebar() {
                     />
                   </div>
                 </div>
-                
+
                 <p className="text-[10px] text-muted-foreground mt-1 leading-relaxed opacity-60 italic ml-1">
                   Leave blank to use environment defaults.
                 </p>
@@ -192,7 +206,7 @@ export function AppSidebar() {
             </span>
           </div>
           <button
-            onClick={() => dispatch(logout())}
+            onClick={handleLogout}
             className="text-muted-foreground hover:text-destructive transition-colors p-2 rounded-md hover:bg-destructive/10"
             title="Log out"
           >

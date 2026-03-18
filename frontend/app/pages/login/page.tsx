@@ -25,15 +25,9 @@ export default function LoginPage() {
 
     try {
       setLoading(true);
-      // 1. Get Token
       const tokenRes = await authApi.login(email, password);
       const token = tokenRes.data.access_token;
-
-      // 2. Set token temporarily in local storage to fetch user profile immediately 
-      // (axios interceptor uses redux, but we need it before dispatch finishes)
       localStorage.setItem("access_token", token);
-
-      // 3. Get User Profile
       const meRes = await authApi.getMe();
       
       // 4. Update Redux
@@ -56,7 +50,6 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-background relative overflow-hidden">
-      {/* Background gradients */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-primary/10 rounded-full blur-[100px] pointer-events-none" />
 
       <div className="w-full max-w-md">

@@ -49,7 +49,6 @@ export const sessionsApi = {
     }),
 
   ask: (question: string, sessionId: string, documentIds: string[]) => {
-    // FastAPI expects list query params as repeated keys: ?document_ids=a&document_ids=b
     const params = new URLSearchParams({
       question,
       session_id: sessionId,

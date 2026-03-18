@@ -27,4 +27,6 @@ export const authApi = {
     openai_api_key?: string;
     anthropic_api_key?: string;
   }) => api.put("/auth/user/settings", settings),
+
+  logout: () => api.post("/auth/logout"),
 };
