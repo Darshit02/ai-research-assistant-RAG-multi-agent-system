@@ -76,7 +76,16 @@ def generate_answer(question: str, user_id: str, session_id: str, db, document_i
     for record in history_cache:
         old_embedding = json.loads(record.embedding)
         if cosine_similarity(question_embedding, old_embedding) > 0.95:
-            return {"answer": record.answer, "citations": [], "cached": True}
+            structured = parse_structured_answer(record.answer)
+            formatted = ""
+            if structured.get("summary", "").strip(): formatted += f"### Summary\n{structured['summary'].strip()}\n\n"
+            if structured.get("key_findings", "").strip(): formatted += f"### Key Findings\n{structured['key_findings'].strip()}\n\n"
+            if structured.get("evidence", "").strip(): formatted += f"### Evidence\n{structured['evidence'].strip()}\n\n"
+            if structured.get("conclusion", "").strip(): formatted += f"### Conclusion\n{structured['conclusion'].strip()}"
+            
+            if not formatted.strip(): formatted = record.answer # Fallback
+            
+            return {**structured, "answer": formatted, "citations": [], "cached": True}
 
     session = db.query(ChatSession).filter(ChatSession.id == session_id).first()
     language = session.language or "English"
@@ -98,7 +107,13 @@ def generate_answer(question: str, user_id: str, session_id: str, db, document_i
             all_chunks.extend(retrieve_context(q, document_ids))
         
         if not all_chunks:
-            return {"message": "No relevant context found.", "citations": []}
+            return {
+                "summary": "No relevant context found in the selected documents.",
+                "key_findings": "",
+                "evidence": "",
+                "conclusion": "",
+                "citations": []
+            }
 
         seen = set()
         context_chunks = []
@@ -167,18 +182,27 @@ def generate_answer(question: str, user_id: str, session_id: str, db, document_i
         return {"error": f"Model error ({provider}): {str(e)}"}
     
     structured = parse_structured_answer(answer)
+    formatted_markdown = ""
+    if structured.get("summary", "").strip(): formatted_markdown += f"### Summary\n{structured['summary'].strip()}\n\n"
+    if structured.get("key_findings", "").strip(): formatted_markdown += f"### Key Findings\n{structured['key_findings'].strip()}\n\n"
+    if structured.get("evidence", "").strip(): formatted_markdown += f"### Evidence\n{structured['evidence'].strip()}\n\n"
+    if structured.get("conclusion", "").strip(): formatted_markdown += f"### Conclusion\n{structured['conclusion'].strip()}"
+    
+    if not formatted_markdown.strip():
+        formatted_markdown = answer
+
     citations = [{"document_id": c["document_id"], "page": c["page"], "text": c["text"]} for c in context_chunks[:5]]
     db.add(ChatMessage(session_id=session_id, role="user", content=question))
     db.add(ChatMessage(
         session_id=session_id, 
         role="assistant", 
-        content=answer,
+        content=formatted_markdown,
         citations=json.dumps(citations)
     ))
-    db.add(ChatHistory(user_id=user_id, question=question, answer=answer, embedding=json.dumps(question_embedding.tolist())))
+    db.add(ChatHistory(user_id=user_id, question=question, answer=formatted_markdown, embedding=json.dumps(question_embedding.tolist())))
     db.commit()
 
-    return {**structured, "citations": citations}
+    return {**structured, "answer": formatted_markdown, "citations": citations}
 
 def stream_answer(question: str, user_id: str, db):
     user = db.query(User).filter(User.id == user_id).first()

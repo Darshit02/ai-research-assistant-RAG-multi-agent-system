@@ -15,7 +15,10 @@ import {
   Bot,
   Cpu,
   Key,
-  Loader2
+  Loader2,
+  Search,
+  FileText,
+  X,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/shared/components/ui/dialog";
 import { Input } from "@/shared/components/ui/input";
@@ -37,6 +40,35 @@ export function AppSidebar() {
   const [anthropicKey, setAnthropicKey] = useState("");
   const [loading, setLoading] = useState(false);
   const [openSettings, setOpenSettings] = useState(false);
+  
+  // Search state
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [showResults, setShowResults] = useState(false);
+
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(async () => {
+      if (searchQuery.trim().length >= 2) {
+        setIsSearching(true);
+        try {
+          const results = await documentsApi.search(searchQuery);
+          // @ts-ignore
+          setSearchResults(results.data);
+          setShowResults(true);
+        } catch (error) {
+          console.error("Search failed:", error);
+        } finally {
+          setIsSearching(false);
+        }
+      } else {
+        setSearchResults([]);
+        setShowResults(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchQuery]);
 
   useEffect(() => {
     if (user) {
@@ -82,7 +114,6 @@ export function AppSidebar() {
   const navItems = [
     { name: "Chat", href: "/pages/chat", icon: MessageSquare },
     { name: "Dashboard", href: "/pages/dashboard", icon: LayoutDashboard },
-    
   ];
 
   if (user?.role === "admin") {
@@ -102,6 +133,63 @@ export function AppSidebar() {
         </Link>
       </div>
 
+      <div className="px-4 mb-4 relative">
+        <div className="relative">
+          <Input
+            placeholder="Search documents..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onFocus={() => searchQuery.length >= 2 && setShowResults(true)}
+            className="pl-9 bg-muted/30 border-none rounded-xl h-10 focus-visible:ring-primary/20"
+          />
+          <Search className="absolute left-3 top-2.5 text-muted-foreground" size={16} />
+          {searchQuery && (
+            <button
+              onClick={() => {
+                setSearchQuery("");
+                setShowResults(false);
+              }}
+              className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground"
+            >
+              <X size={16} />
+            </button>
+          )}
+        </div>
+
+        {/* Search Results Dropdown */}
+        {showResults && (
+          <div className="absolute left-4 right-4 mt-2 bg-background border border-border rounded-xl shadow-xl z-50 overflow-hidden glass-card max-h-60 overflow-y-auto custom-scrollbar">
+            {isSearching ? (
+              <div className="p-4 flex items-center justify-center gap-2 text-muted-foreground text-xs">
+                <Loader2 size={14} className="animate-spin" />
+                Searching...
+              </div>
+            ) : searchResults.length > 0 ? (
+              <div className="py-2">
+                {searchResults.map((doc) => (
+                  <button
+                    key={doc.id}
+                    onClick={() => {
+                      router.push(`/pages/chat?docId=${doc.id}`);
+                      setShowResults(false);
+                      setSearchQuery("");
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-2 hover:bg-muted text-left transition-colors"
+                  >
+                    <FileText size={14} className="text-primary/70" />
+                    <span className="text-xs truncate">{doc.filename}</span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="p-4 text-center text-xs text-muted-foreground">
+                No documents found
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
       <nav className="flex-1 px-4 space-y-1 overflow-y-auto">
         {navItems.map((item) => {
           const isActive = pathname.startsWith(item.href);
@@ -109,9 +197,9 @@ export function AppSidebar() {
             <Link
               key={item.href}
               href={item.href}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 ${isActive
-                  ? "bg-primary/10 text-primary font-medium"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all cursor-pointer duration-200 ${isActive
+                ? "bg-primary/10 text-primary font-medium"
+                : "text-muted-foreground hover:bg-muted hover:text-foreground"
                 }`}
             >
               <item.icon size={18} className={isActive ? "text-primary" : ""} />
@@ -123,7 +211,7 @@ export function AppSidebar() {
         <Dialog open={openSettings} onOpenChange={setOpenSettings}>
           <DialogTrigger asChild>
             <button
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 text-muted-foreground hover:bg-muted hover:text-foreground"
+              className="w-full flex cursor-pointer items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 text-muted-foreground hover:bg-muted hover:text-foreground"
             >
               <Settings size={18} />
               Settings

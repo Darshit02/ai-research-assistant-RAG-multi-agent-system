@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { useDispatch, useSelector } from "react-redux";
 import { RootState } from "@/app/provider/store";
 import {
@@ -44,15 +45,18 @@ import {
 } from "@/shared/components/ui/sheet";
 import { authApi } from "@/shared/api/auth";
 import { toast } from "sonner";
-import { Send, Plus, MessageSquare, Trash2, Library, CheckSquare, Square, Bot, Eye, Settings2, Sparkles, Globe } from "lucide-react";
+import { Send, Plus, MessageSquare, Trash2, Library, CheckSquare, Square, Bot, Eye, Settings2, Sparkles, Globe, Loader2 } from "lucide-react";
 
-export default function ChatPage() {
+function ChatPage() {
   const dispatch = useDispatch();
   const { sessions, activeSessionId, messages } = useSelector((state: RootState) => state.chat);
   const { list: documents, selectedIds } = useSelector((state: RootState) => state.documents);
   const [input, setInput] = useState("");
   const [isAsking, setIsAsking] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const searchParams = useSearchParams();
+  const docIdParam = searchParams.get("docId");
 
   // States for renaming
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
@@ -82,6 +86,15 @@ export default function ChatPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, activeSessionId, isAsking]);
 
+  // Handle docId from query param once documents are loaded
+  useEffect(() => {
+    if (docIdParam && documents.length > 0) {
+      if (!selectedIds.includes(docIdParam)) {
+        dispatch(toggleSelectedDoc(docIdParam));
+      }
+    }
+  }, [docIdParam, documents.length]);
+
   const loadInitialData = async () => {
     try {
       const [sessRes, docsRes, userRes] = await Promise.all([
@@ -95,6 +108,15 @@ export default function ChatPage() {
 
       if (sessRes.data.length > 0 && !activeSessionId) {
         dispatch(setActiveSession(sessRes.data[0].session_id));
+      }
+
+      // Handle docId from query param
+      if (docIdParam) {
+        // We need to wait for documents to be loaded which they are now
+        // If not already selected, select it
+        if (!selectedIds.includes(docIdParam)) {
+          dispatch(toggleSelectedDoc(docIdParam));
+        }
       }
     } catch (error) {
       toast.error("Failed to load session data");
@@ -186,9 +208,7 @@ export default function ChatPage() {
 
     const question = input.trim();
     setInput("");
-
-    // Optimistically add user message
-    dispatch(appendMessage({
+      dispatch(appendMessage({
       sessionId: activeSessionId,
       message: { role: "user", content: question, created_at: new Date().toISOString() }
     }));
@@ -210,9 +230,19 @@ export default function ChatPage() {
         toast.error(res.data.error);
         return;
       }
+      // Use pre-formatted answer from backend, or fallback to defensive formatting if needed
+      let formattedContent = (res.data as any).answer || "";
+      
+      if (!formattedContent.trim()) {
+        if (res.data.summary?.trim()) formattedContent += `### Summary\n${res.data.summary.trim()}\n\n`;
+        if (res.data.key_findings?.trim()) formattedContent += `### Key Findings\n${res.data.key_findings.trim()}\n\n`;
+        if (res.data.evidence?.trim()) formattedContent += `### Evidence\n${res.data.evidence.trim()}\n\n`;
+        if (res.data.conclusion?.trim()) formattedContent += `### Conclusion\n${res.data.conclusion.trim()}`;
+      }
 
-      // Format the structured response into a single content block for now
-      const formattedContent = `### Summary\n${res.data.summary}\n\n### Key Findings\n${res.data.key_findings}\n\n### Evidence\n${res.data.evidence}\n\n### Conclusion\n${res.data.conclusion}`;
+      if (!formattedContent.trim()) {
+        formattedContent = (res.data as any).message || "No relevant information found.";
+      }
 
       dispatch(appendMessage({
         sessionId: activeSessionId,
@@ -571,5 +601,13 @@ export default function ChatPage() {
         </SheetContent>
       </Sheet>
     </div>
+  );
+}
+
+export default function SuspendedChatPage() {
+  return (
+    <Suspense fallback={<div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin text-primary" /></div>}>
+      <ChatPage />
+    </Suspense>
   );
 }
